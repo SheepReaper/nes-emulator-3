@@ -5,7 +5,10 @@ using SR.Emulation.Nes.Abtractions;
 
 namespace SR.Emulation.Nes;
 
-public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandard = NesVideoStandard.Ntsc) : IBusMaster, IBusDevice
+public sealed class Ppu(
+    InterruptLines interrupts,
+    NesVideoStandard videoStandard = NesVideoStandard.Ntsc,
+    NesTiming? timing = null) : IBusMaster, IBusDevice
 {
     internal const int FrameWidth = 256;
     internal const int FrameHeight = 240;
@@ -15,7 +18,7 @@ public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandar
     private readonly byte[] _renderFrame = new byte[FrameBufferSize];
     private readonly byte[] _publishedFrame = new byte[FrameBufferSize];
     private readonly object _frameLock = new();
-    private readonly int _scanlineCount = videoStandard == NesVideoStandard.Pal ? 312 : 262;
+    private readonly NesTiming _timing = timing ?? (videoStandard == NesVideoStandard.Pal ? new PalTiming() : new NtscTiming());
     private readonly SpriteRenderData[] _sprites = new SpriteRenderData[8];
 
     private IBus? _bus;
@@ -90,6 +93,7 @@ public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandar
         FrameNumber = 0;
         _hasPublishedFrame = false;
         interrupts.Nmi = false;
+        interrupts.DelayNmiOneInstruction = false;
     }
 
     public byte Read(ushort address)
@@ -114,7 +118,14 @@ public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandar
                 var wasNmiEnabled = _ppuCtrl.VBlankNmiEnable;
                 _ppuCtrl.Value = value;
                 _tempVramAddress = (ushort)((_tempVramAddress & 0xF3FF) | ((value & 0x03) << 10));
-                if (!wasNmiEnabled && _ppuCtrl.VBlankNmiEnable && _ppuStatus.VBlank) interrupts.Nmi = true;
+                if (!wasNmiEnabled && _ppuCtrl.VBlankNmiEnable && _ppuStatus.VBlank)
+                {
+                    interrupts.Nmi = true;
+                    // CPU writes are applied at the beginning of the instruction in this functional core.
+                    // A physical STA changes PPUCTRL on its final cycle, after the interrupt poll, so the
+                    // instruction following the STA completes before this immediate NMI is recognized.
+                    interrupts.DelayNmiOneInstruction = true;
+                }
                 if (!_ppuCtrl.VBlankNmiEnable) interrupts.Nmi = false;
                 break;
             case 0x2001:
@@ -148,7 +159,7 @@ public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandar
         // Timing and fetch phases: https://www.nesdev.org/wiki/PPU_rendering
         Debug.Assert(_bus != null, "PPU bus is not connected.");
         if (_bus is PpuBus ppuBus) ppuBus.AdvanceCycle();
-        var preRenderScanline = _scanlineCount - 1;
+        var preRenderScanline = _timing.ScanlinesPerFrame - 1;
         var renderingEnabled = IsRenderingEnabled;
 
         if (_scanline == preRenderScanline && _cycle == 1)
@@ -178,7 +189,7 @@ public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandar
 
         if (_scanline < FrameHeight && _cycle is >= 1 and <= 256) RenderPixel(_cycle - 1, _scanline);
 
-        var completedFrame = _scanline == 239 && _cycle == 340 ? PublishFrame() : (ulong?)null;
+        var completedFrame = _scanline == 239 && _cycle == _timing.DotsPerScanline - 1 ? PublishFrame() : (ulong?)null;
         AdvanceTiming(preRenderScanline, renderingEnabled);
         if (completedFrame.HasValue) FrameCompleted?.Invoke(completedFrame.Value);
     }
@@ -187,7 +198,7 @@ public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandar
     {
         // NTSC omits the final pre-render dot on odd frames while rendering.
         if (videoStandard == NesVideoStandard.Ntsc && _oddFrame && renderingEnabled &&
-            _scanline == preRenderScanline && _cycle == 339)
+            _scanline == preRenderScanline && _cycle == _timing.DotsPerScanline - 2)
         {
             _cycle = 0;
             _scanline = 0;
@@ -196,10 +207,10 @@ public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandar
         }
 
         _cycle++;
-        if (_cycle <= 340) return;
+        if (_cycle < _timing.DotsPerScanline) return;
         _cycle = 0;
         _scanline++;
-        if (_scanline < _scanlineCount) return;
+        if (_scanline < _timing.ScanlinesPerFrame) return;
         _scanline = 0;
         _oddFrame = !_oddFrame;
     }
@@ -280,7 +291,8 @@ public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandar
             EvaluateSpritesForNextScanline();
         }
         if (_scanline == preRenderScanline && _cycle is >= 280 and <= 304) CopyVerticalBits();
-        if (_cycle is 338 or 340) _nextTileId = _bus!.Read((ushort)(0x2000 | (_vramAddress & 0x0FFF)));
+        if (_cycle == _timing.DotsPerScanline - 3 || _cycle == _timing.DotsPerScanline - 1)
+            _nextTileId = _bus!.Read((ushort)(0x2000 | (_vramAddress & 0x0FFF)));
     }
 
     private ushort GetBackgroundPatternAddress(int planeOffset)
@@ -376,7 +388,11 @@ public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandar
                 : 0x3F10 + (spritePalette * 4) + spritePixel;
         }
 
-        var color = _bus!.Read((ushort)paletteAddress) & 0x3F;
+        // Palette RAM is internal to the PPU. Pixel composition must not expose a synthetic
+        // palette read on the external PPU address bus, where mappers observe A12 transitions.
+        var color = (_bus is PpuBus ppuBus
+            ? ppuBus.Peek((ushort)paletteAddress)
+            : _bus!.Read((ushort)paletteAddress)) & 0x3F;
         if (_ppuMask.Grayscale) color &= 0x30;
         WriteRgbaPixel(x, y, color);
     }
@@ -394,7 +410,7 @@ public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandar
     private void EvaluateSpritesForNextScanline()
     {
         _spriteCount = 0;
-        var nextScanline = _scanline == _scanlineCount - 1 ? 0 : _scanline + 1;
+        var nextScanline = _scanline == _timing.ScanlinesPerFrame - 1 ? 0 : _scanline + 1;
         if (nextScanline >= FrameHeight) return;
         var height = _ppuCtrl.SpriteSize ? 16 : 8;
         var inRangeCount = 0;
@@ -495,6 +511,7 @@ public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandar
         if (_scanline == 241 && _cycle <= 1) _suppressVblank = true;
         _ppuStatus.VBlank = false;
         interrupts.Nmi = false;
+        interrupts.DelayNmiOneInstruction = false;
         _writeToggle = false;
         _ioLatch = value;
         return value;

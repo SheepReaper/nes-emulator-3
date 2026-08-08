@@ -4,10 +4,12 @@ using SR.Emulation.Nes.Abtractions;
 
 namespace SR.Emulation.Nes;
 
-public sealed class Apu(InterruptLines interrupts) : IBusDevice
+public sealed class Apu(InterruptLines interrupts, ApuRegion? region = null) : IBusDevice
 {
     private readonly InterruptLines _interrupts = interrupts;
     private readonly byte[] _registers = new byte[0x18];
+
+    public ApuRegion Region { get; } = region ?? ApuRegion.Default;
 
     public byte Read(ushort address)
     {

@@ -1239,6 +1239,65 @@ public class CpuTests
         Assert.Equal(0b10100101, _bus.Read(0x01FB));
     }
 
+    [Fact]
+    public void DelayedNmi_AllowsTheFollowingInstructionToCompleteBeforeInterrupting()
+    {
+        _bus.Load(0x8000, [0xEA, 0xEA]);
+        _bus.Write(0xFFFA, 0x00);
+        _bus.Write(0xFFFB, 0x90);
+        SetPc(0x8000);
+        SetCycles(0);
+        _interrupts.Nmi = true;
+        typeof(InterruptLines).GetProperty("DelayNmiOneInstruction", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(_interrupts, true);
+
+        Clock(2);
+
+        Assert.Equal(0x8001, GetPc());
+        Assert.True(_interrupts.Nmi);
+
+        _cpu.Clock();
+
+        Assert.Equal(0x9000, GetPc());
+        Assert.False(_interrupts.Nmi);
+    }
+
+    [Fact]
+    public void NmiEdge_RemainsPendingAfterTheInputLineFalls()
+    {
+        _bus.Write(0xFFFA, 0x00);
+        _bus.Write(0xFFFB, 0x90);
+        SetPc(0x8000);
+        SetCycles(1);
+        _interrupts.Nmi = true;
+
+        _cpu.Clock();
+        _interrupts.Nmi = false;
+        _cpu.Clock();
+
+        Assert.Equal(0x9000, GetPc());
+    }
+
+    [Fact]
+    public void Cli_DelaysAnAssertedIrqUntilAfterTheFollowingInstruction()
+    {
+        _bus.Load(0x8000, [0x58, 0xEA, 0xEA]);
+        _bus.Write(0xFFFE, 0x00);
+        _bus.Write(0xFFFF, 0x90);
+        SetPc(0x8000);
+        SetP(0b0010_0100);
+        SetCycles(0);
+        _interrupts.Irq = true;
+
+        Clock(4);
+
+        Assert.Equal(0x8002, GetPc());
+
+        _cpu.Clock();
+
+        Assert.Equal(0x9000, GetPc());
+    }
+
     [Theory]
     [InlineData(false, 0x9000, true)]  // IRQ when I flag is clear: should trigger
     [InlineData(true, 0x8001, true)]   // IRQ when I flag is set: should be ignored

@@ -24,6 +24,10 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     private byte _opcode;           // Current opcode being executed
     private ulong _masterClock;     // Tracks the master clock for odd/even cycle checks
     private ulong _totalCyclesExecuted;
+    private bool _nmiInputHigh;
+    private bool _nmiPending;
+    private bool _delayPendingNmiOneInstruction;
+    private bool _deferIrqOneInstruction;
 
     public void ConnectBus(IBus bus)
     {
@@ -45,6 +49,11 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
         // Set I flag, clear others. Bit 5 is unused and always 1.
         _p.Value = 0b0010_0100;
 
+        _nmiInputHigh = false;
+        _nmiPending = false;
+        _delayPendingNmiOneInstruction = false;
+        _deferIrqOneInstruction = false;
+
         // The 2A03 reset sequence takes 7 cycles before opcode execution begins.
         _cycles = 7;
     }
@@ -53,19 +62,38 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     {
         _masterClock = masterClock;
 
+        if (_interrupts.Nmi && !_nmiInputHigh)
+        {
+            _nmiPending = true;
+            _delayPendingNmiOneInstruction = _interrupts.DelayNmiOneInstruction;
+            _interrupts.DelayNmiOneInstruction = false;
+        }
+        _nmiInputHigh = _interrupts.Nmi;
+
         if (_cycles == 0)
         {
             // Check for interrupts before fetching the next instruction
-            if (_interrupts.Nmi)
+            if (_nmiPending)
             {
-                HandleNmi();
-                _interrupts.Nmi = false;
-                _cycles--;
-                _totalCyclesExecuted++;
-                return;
+                if (_delayPendingNmiOneInstruction)
+                {
+                    _delayPendingNmiOneInstruction = false;
+                }
+                else
+                {
+                    HandleNmi();
+                    _nmiPending = false;
+                    _interrupts.Nmi = false;
+                    _nmiInputHigh = false;
+                    _cycles--;
+                    _totalCyclesExecuted++;
+                    return;
+                }
             }
 
-            if (_interrupts.Irq && !_p.InterruptDisable)
+            var deferIrq = _deferIrqOneInstruction;
+            _deferIrqOneInstruction = false;
+            if (_interrupts.Irq && !_p.InterruptDisable && !deferIrq)
             {
                 HandleIrq();
                 // The IRQ line is not cleared by the CPU, but by the device that asserted it.
@@ -1132,7 +1160,12 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     // SEC (Set Carry Flag)
     private void SEC_IMP() { _p.Carry = true; _cycles = 2; }
     // CLI (Clear Interrupt Disable)
-    private void CLI_IMP() { _p.InterruptDisable = false; _cycles = 2; }
+    private void CLI_IMP()
+    {
+        _deferIrqOneInstruction = _p.InterruptDisable;
+        _p.InterruptDisable = false;
+        _cycles = 2;
+    }
     // SEI (Set Interrupt Disable)
     private void SEI_IMP() { _p.InterruptDisable = true; _cycles = 2; }
     // CLV (Clear Overflow Flag)

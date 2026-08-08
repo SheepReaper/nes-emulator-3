@@ -32,10 +32,16 @@ public sealed class Nes
     public Nes(NesVideoStandard videoStandard = NesVideoStandard.Ntsc)
     {
         VideoStandard = videoStandard;
+        Timing = videoStandard switch
+        {
+            NesVideoStandard.Ntsc => new NtscTiming(),
+            NesVideoStandard.Pal => new PalTiming(),
+            _ => throw new ArgumentOutOfRangeException(nameof(videoStandard))
+        };
         _cartridgeFactory = new CartridgeFactory(_interrupts);
         _cpu = new Cpu(_interrupts);
-        _ppu = new Ppu(_interrupts, videoStandard);
-        _apu = new Apu(_interrupts);
+        _ppu = new Ppu(_interrupts, videoStandard, Timing);
+        _apu = new Apu(_interrupts, Timing.ApuRegion);
 
         _ppuBus = new PpuBus(_cartridgeSlot);
         _ppu.ConnectBus(_ppuBus);
@@ -49,6 +55,7 @@ public sealed class Nes
     }
 
     public NesVideoStandard VideoStandard { get; }
+    public NesTiming Timing { get; }
     public INesDebugger Debugger { get; }
     public event EventHandler<FrameReadyEventArgs>? FrameReady;
 
@@ -161,15 +168,12 @@ public sealed class Nes
 
     private void ClockCore()
     {
-        // The PPU clock runs 3x faster than the CPU clock.
         _ppu.Clock();
 
-        var numerator = VideoStandard == NesVideoStandard.Pal ? 5 : 1;
-        var denominator = VideoStandard == NesVideoStandard.Pal ? 16 : 3;
-        _cpuClockAccumulator += numerator;
-        if (_cpuClockAccumulator >= denominator)
+        _cpuClockAccumulator += Timing.PpuDivisor;
+        if (_cpuClockAccumulator >= Timing.CpuDivisor)
         {
-            _cpuClockAccumulator -= denominator;
+            _cpuClockAccumulator -= Timing.CpuDivisor;
             _cpu.Clock(_cpuClockCounter++);
         }
 
@@ -189,9 +193,7 @@ public sealed class Nes
     {
         get
         {
-            var numerator = VideoStandard == NesVideoStandard.Pal ? 5 : 1;
-            var denominator = VideoStandard == NesVideoStandard.Pal ? 16 : 3;
-            return _cpuClockAccumulator + numerator >= denominator;
+            return _cpuClockAccumulator + Timing.PpuDivisor >= Timing.CpuDivisor;
         }
     }
 

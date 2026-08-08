@@ -79,6 +79,34 @@ public sealed class PpuTests
         Assert.Equal(expectedCpuClocks, (ulong)field.GetValue(nes)!);
     }
 
+    public static TheoryData<NesVideoStandard, Type, int, int, int, int, ApuRegion> TimingCases => new()
+    {
+        { NesVideoStandard.Ntsc, typeof(NtscTiming), 21_477_272, 12, 4, 262, ApuRegion.Ntsc },
+        { NesVideoStandard.Pal, typeof(PalTiming), 26_601_712, 16, 5, 312, ApuRegion.Pal }
+    };
+
+    [Theory]
+    [MemberData(nameof(TimingCases))]
+    public void VideoStandardSelectsTheSharedTimingProfile(
+        NesVideoStandard standard,
+        Type timingType,
+        int masterClockHz,
+        int cpuDivisor,
+        int ppuDivisor,
+        int scanlines,
+        ApuRegion apuRegion)
+    {
+        var nes = new Nes(standard);
+
+        Assert.IsType(timingType, nes.Timing);
+        Assert.Equal(masterClockHz, nes.Timing.MasterClockHz);
+        Assert.Equal(cpuDivisor, nes.Timing.CpuDivisor);
+        Assert.Equal(ppuDivisor, nes.Timing.PpuDivisor);
+        Assert.Equal(scanlines, nes.Timing.ScanlinesPerFrame);
+        Assert.Equal(341, nes.Timing.DotsPerScanline);
+        Assert.Equal(apuRegion, nes.Timing.ApuRegion);
+    }
+
     [Theory]
     [InlineData(NesVideoStandard.Ntsc, 341 * 262)]
     [InlineData(NesVideoStandard.Pal, 341 * 312)]
