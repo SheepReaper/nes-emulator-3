@@ -6,6 +6,16 @@ namespace SR.Emulation.Nes.Tests;
 public sealed class Mapper4Tests
 {
     [Fact]
+    public void SixteenKilobytePrg_IsSupportedForHardwareTestCartridges()
+    {
+        var cartridge = new Mmc3Cart(
+            new byte[0x4000], new byte[0x2000], NametableMirroring.Vertical, false, new InterruptLines());
+
+        Assert.Equal(0, cartridge.CpuRead(0x8000));
+        Assert.Equal(0, cartridge.CpuRead(0xE000));
+    }
+
+    [Fact]
     public void Factory_CreatesMapper4AndMapsFixedPrgBanks()
     {
         var cartridge = CreateCartridge();

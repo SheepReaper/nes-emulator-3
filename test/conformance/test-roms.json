@@ -1,0 +1,20 @@
+{
+  "upstreamCommit": "95d8f621ae55cee0d09b91519a8989ae0e64753b",
+  "tests": [
+    { "suite": "ppu_vbl_nmi", "name": "01-vbl_basics", "path": "ppu_vbl_nmi/rom_singles/01-vbl_basics.nes", "sha256": "06aea5af4edab4e3141c939cd5ac9936f8758203b25dcaf84ae1a09db49e024a", "maximumPpuDots": 60000000 },
+    { "suite": "ppu_vbl_nmi", "name": "02-vbl_set_time", "path": "ppu_vbl_nmi/rom_singles/02-vbl_set_time.nes", "sha256": "dd98856130078844e3aa4bd95a9be8ab501ea84c089f1d8ad49a1b20af4b3a80", "maximumPpuDots": 60000000 },
+    { "suite": "ppu_vbl_nmi", "name": "03-vbl_clear_time", "path": "ppu_vbl_nmi/rom_singles/03-vbl_clear_time.nes", "sha256": "787fdaa4dd6c5b6df5f4308fb6d55b57e2c2f69bd5ecdf8ad5c69735db4fcc72", "maximumPpuDots": 60000000 },
+    { "suite": "ppu_vbl_nmi", "name": "04-nmi_control", "path": "ppu_vbl_nmi/rom_singles/04-nmi_control.nes", "sha256": "84722c75b896c47c8642f83220230fe14f0a31e55e26ecb83c400e6a26d91b32", "maximumPpuDots": 10000000 },
+    { "suite": "ppu_vbl_nmi", "name": "05-nmi_timing", "path": "ppu_vbl_nmi/rom_singles/05-nmi_timing.nes", "sha256": "72e515d689d7404ae5779b8c9c4c7b3563a755a94bd44864516f1b03df044482", "maximumPpuDots": 60000000 },
+    { "suite": "ppu_vbl_nmi", "name": "06-suppression", "path": "ppu_vbl_nmi/rom_singles/06-suppression.nes", "sha256": "811dd5997bbf48c2e5687ab06845f17ea76b2be472786596c334137582cc72aa", "maximumPpuDots": 60000000 },
+    { "suite": "ppu_vbl_nmi", "name": "07-nmi_on_timing", "path": "ppu_vbl_nmi/rom_singles/07-nmi_on_timing.nes", "sha256": "1ed154363660b5775b112ae63ce9bb4e400ebde2afef4d0ac12fc433efda3702", "maximumPpuDots": 60000000 },
+    { "suite": "ppu_vbl_nmi", "name": "08-nmi_off_timing", "path": "ppu_vbl_nmi/rom_singles/08-nmi_off_timing.nes", "sha256": "1d2a4093091c8e58a7f99d6a3531bbc6346b52cfc59bcb17ca04c1f2376cf2fc", "maximumPpuDots": 60000000 },
+    { "suite": "ppu_vbl_nmi", "name": "09-even_odd_frames", "path": "ppu_vbl_nmi/rom_singles/09-even_odd_frames.nes", "sha256": "1ac04283021ddd9294cc74ee709c55e20a350dc4815c15a8a93b3654837e858d", "maximumPpuDots": 10000000 },
+    { "suite": "ppu_vbl_nmi", "name": "10-even_odd_timing", "path": "ppu_vbl_nmi/rom_singles/10-even_odd_timing.nes", "sha256": "7217d2d172ce11ad45c4da40c2f22201cf0eb758bc2cd8dd39d2cf0a7d4ca83e", "maximumPpuDots": 10000000 },
+    { "suite": "mmc3_test_2", "name": "1-clocking", "path": "mmc3_test_2/rom_singles/1-clocking.nes", "sha256": "b06d8a97f0ca672be92c841d6af7d1e650696e86e9cc0cf6eeb90d67a6ab499b", "maximumPpuDots": 10000000 },
+    { "suite": "mmc3_test_2", "name": "2-details", "path": "mmc3_test_2/rom_singles/2-details.nes", "sha256": "e7af16c764b119e60effb7b1cfeec3dd8e2e657041283693cdbbeedb4081f1e3", "maximumPpuDots": 10000000 },
+    { "suite": "mmc3_test_2", "name": "3-A12_clocking", "path": "mmc3_test_2/rom_singles/3-A12_clocking.nes", "sha256": "b375f15b9f9d372c8084b9c50928be9e41a3ac48be831ce82d203c18891433ad", "maximumPpuDots": 10000000 },
+    { "suite": "mmc3_test_2", "name": "4-scanline_timing", "path": "mmc3_test_2/rom_singles/4-scanline_timing.nes", "sha256": "14a220b9d1272acc7a820ab38e9762a7cdf2d54c65e753be87f23dfcaf1bb845", "maximumPpuDots": 10000000 },
+    { "suite": "mmc3_test_2", "name": "5-MMC3", "path": "mmc3_test_2/rom_singles/5-MMC3.nes", "sha256": "e0824123d60b83868dac1189b28250f8e10376a01be468a5a74aa59937cb32ca", "maximumPpuDots": 10000000 }
+  ]
+}
