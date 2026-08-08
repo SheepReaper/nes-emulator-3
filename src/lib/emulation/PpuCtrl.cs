@@ -1,27 +1,13 @@
-using System.Runtime.InteropServices;
-
 namespace SR.Emulation.Nes;
 
-[StructLayout(LayoutKind.Explicit)]
 public record struct PpuCtrl
 {
-    [FieldOffset(0)]
     public byte Value;
-
-    [FieldOffset(0)]
-    private readonly byte _nametableAddress; // NN
-    [FieldOffset(2)]
-    public readonly bool VramIncrement; // I
-    [FieldOffset(3)]
-    public readonly bool SpritePatternTableAddress; // S
-    [FieldOffset(4)]
-    public readonly bool BackgroundPatternTableAddress; // B
-    [FieldOffset(5)]
-    public readonly bool SpriteSize; // H
-    [FieldOffset(6)]
-    public readonly bool PpuMasterSlaveSelect; // P
-    [FieldOffset(7)]
-    public readonly bool VBlankNmiEnable; // V
-
-    public readonly ushort BaseNametableAddress => (ushort)(0x2000 + (_nametableAddress & 0x3) * 0x400);
+    public readonly bool VramIncrement => (Value & 0x04) != 0;
+    public readonly bool SpritePatternTableAddress => (Value & 0x08) != 0;
+    public readonly bool BackgroundPatternTableAddress => (Value & 0x10) != 0;
+    public readonly bool SpriteSize => (Value & 0x20) != 0;
+    public readonly bool PpuMasterSlaveSelect => (Value & 0x40) != 0;
+    public readonly bool VBlankNmiEnable => (Value & 0x80) != 0;
+    public readonly ushort BaseNametableAddress => (ushort)(0x2000 + (Value & 0x03) * 0x0400);
 }

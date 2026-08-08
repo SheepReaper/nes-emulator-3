@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace SR.Emulation.Nes;
 
-public sealed class CartridgeFactory
+public sealed class CartridgeFactory(InterruptLines? interrupts = null)
 {
     private static readonly byte[] INES_HEADER_CONSTANT = { 0x4E, 0x45, 0x53, 0x1A }; // "NES" + MS-DOS EOF
 
@@ -25,25 +25,40 @@ public sealed class CartridgeFactory
         var prgRomSizeIn16Kb = header[4];
         var chrRomSizeIn8Kb = header[5];
         var flags6 = header[6];
+        var flags7 = header[7];
 
-        var mapperNumber = (flags6 >> 4); // For now, we only consider the lower nibble
+        var nametableMirroring = (flags6 & 0x08) != 0
+            ? NametableMirroring.FourScreen
+            : (flags6 & 0x01) != 0
+                ? NametableMirroring.Vertical
+                : NametableMirroring.Horizontal;
 
-        if (mapperNumber != 0)
-        {
-            throw new NotSupportedException($"Mapper {mapperNumber} is not supported yet.");
-        }
+        var mapperNumber = (flags6 >> 4) | (flags7 & 0xF0);
 
         var prgRomSize = prgRomSizeIn16Kb * 0x4000; // 16KB
         var chrRomSize = chrRomSizeIn8Kb * 0x2000; // 8KB
 
-        var prgRom = romData.AsSpan(16, prgRomSize).ToArray();
-        var chrRom = romData.AsSpan(16 + prgRomSize, chrRomSize).ToArray();
+        var dataOffset = 16 + ((flags6 & 0x04) != 0 ? 512 : 0);
+        var requiredLength = dataOffset + prgRomSize + chrRomSize;
+        if (romData.Length < requiredLength)
+            throw new ArgumentException("Invalid ROM data: File is shorter than the sizes declared in its header.", nameof(romData));
 
-        // Based on Mapper 0 (NROM) variants
+        var prgRom = romData.AsSpan(dataOffset, prgRomSize).ToArray();
+        var hasChrRam = chrRomSize == 0;
+        var chrRom = hasChrRam
+            ? new byte[0x2000]
+            : romData.AsSpan(dataOffset + prgRomSize, chrRomSize).ToArray();
+
+        if (mapperNumber == 1)
+            return new Mmc1Cart(prgRom, chrRom, nametableMirroring, hasChrRam);
+        if (mapperNumber == 4)
+            return new Mmc3Cart(prgRom, chrRom, nametableMirroring, hasChrRam, interrupts ?? new InterruptLines());
+        if (mapperNumber != 0)
+            throw new NotSupportedException($"Mapper {mapperNumber} is not supported yet.");
+
         return prgRomSizeIn16Kb switch
         {
-            1 => new Nrom128Cart(prgRom, chrRom), // 16KB PRG-ROM
-            2 => new Nrom256Cart(prgRom, chrRom), // 32KB PRG-ROM
+            1 or 2 => new NromCart(prgRom, chrRom, nametableMirroring, hasChrRam),
             _ => throw new NotSupportedException($"NROM with {prgRomSizeIn16Kb} * 16KB PRG-ROM is not supported.")
         };
     }

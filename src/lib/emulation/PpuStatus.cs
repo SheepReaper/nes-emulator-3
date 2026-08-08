@@ -1,19 +1,12 @@
-using System.Runtime.InteropServices;
-
 namespace SR.Emulation.Nes;
 
-[StructLayout(LayoutKind.Explicit)]
 public record struct PpuStatus
 {
-    [FieldOffset(0)]
     public byte Value;
+    public bool SpriteOverflow { readonly get => (Value & 0x20) != 0; set => Value = Set(Value, 0x20, value); }
+    public bool Sprite0Hit { readonly get => (Value & 0x40) != 0; set => Value = Set(Value, 0x40, value); }
+    public bool VBlank { readonly get => (Value & 0x80) != 0; set => Value = Set(Value, 0x80, value); }
 
-    [FieldOffset(5)]
-    public bool SpriteOverflow;
-
-    [FieldOffset(6)]
-    public bool Sprite0Hit;
-
-    [FieldOffset(7)]
-    public bool VBlank;
+    private static byte Set(byte value, byte mask, bool enabled) =>
+        enabled ? (byte)(value | mask) : (byte)(value & ~mask);
 }

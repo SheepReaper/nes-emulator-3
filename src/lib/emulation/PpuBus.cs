@@ -6,13 +6,15 @@ namespace SR.Emulation.Nes;
 
 public sealed class PpuBus(CartridgeSlot cartridgeSlot) : IBus
 {
-    private readonly byte[] _vRam = new byte[0x800]; // 2KB of VRAM for nametables
+    private readonly byte[] _vRam = new byte[0x1000]; // Up to 4KB for four-screen nametables
     private readonly byte[] _paletteRam = new byte[0x20]; // 32 bytes of Palette RAM
+    private ulong _ppuCycle;
 
     public byte Read(ushort address)
     {
         // PPU addresses are masked to 14 bits
         address &= 0x3FFF;
+        ObservePpuAddress(address);
 
         return address switch
         {
@@ -27,6 +29,7 @@ public sealed class PpuBus(CartridgeSlot cartridgeSlot) : IBus
     {
         // PPU addresses are masked to 14 bits
         address &= 0x3FFF;
+        ObservePpuAddress(address);
 
         Action write = address switch
         {
@@ -39,14 +42,22 @@ public sealed class PpuBus(CartridgeSlot cartridgeSlot) : IBus
         write();
     }
 
-    private static ushort GetVramAddress(ushort address)
+    private ushort GetVramAddress(ushort address)
     {
-        // TODO: Implement proper mirroring based on cartridge settings (Horizontal/Vertical)
-        // For now, using Vertical mirroring as a default.
-        // $2000-$27FF maps to the 2KB VRAM.
-        // $2800-$2FFF is a mirror of $2000-$27FF.
-        // $3000-$3EFF is a mirror of $2000-$2EFF.
-        return (ushort)(address & 0x07FF);
+        // $3000-$3EFF mirrors $2000-$2EFF before cartridge mirroring is applied.
+        var nametableAddress = (ushort)((address - 0x2000) & 0x0FFF);
+        var table = nametableAddress / 0x0400;
+        var offset = nametableAddress & 0x03FF;
+        var mirroring = cartridgeSlot.Cartridge?.NametableMirroring ?? NametableMirroring.Horizontal;
+        var physicalTable = mirroring switch
+        {
+            NametableMirroring.Vertical => table & 0x01,
+            NametableMirroring.Horizontal => table >> 1,
+            NametableMirroring.FourScreen => table,
+            NametableMirroring.SingleScreenUpper => 1,
+            _ => 0
+        };
+        return (ushort)((physicalTable * 0x0400) + offset);
     }
 
     private static ushort GetPaletteRamAddress(ushort address)
@@ -60,5 +71,40 @@ public sealed class PpuBus(CartridgeSlot cartridgeSlot) : IBus
             return (ushort)(mirroredAddress & 0x0F);
         }
         return mirroredAddress;
+    }
+
+    internal int VramSize => _vRam.Length;
+    internal int PaletteRamSize => _paletteRam.Length;
+    internal void CopyVram(int offset, Span<byte> destination) => _vRam.AsSpan(offset, destination.Length).CopyTo(destination);
+    internal void CopyPaletteRam(int offset, Span<byte> destination) => _paletteRam.AsSpan(offset, destination.Length).CopyTo(destination);
+    internal void WriteVram(int offset, ReadOnlySpan<byte> source) => source.CopyTo(_vRam.AsSpan(offset, source.Length));
+    internal void WritePaletteRam(int offset, ReadOnlySpan<byte> source) => source.CopyTo(_paletteRam.AsSpan(offset, source.Length));
+
+    internal byte Peek(ushort address)
+    {
+        address &= 0x3FFF;
+        return address switch
+        {
+            <= 0x1FFF => cartridgeSlot.PpuPeek(address),
+            <= 0x3EFF => _vRam[GetVramAddress(address)],
+            _ => _paletteRam[GetPaletteRamAddress(address)]
+        };
+    }
+
+    internal void AdvanceCycle() => _ppuCycle++;
+    internal void ResetCycle() => _ppuCycle = 0;
+    internal void NotifyPpuAddress(ushort address)
+    {
+        address &= 0x3FFF;
+        if (address >= 0x3F00) address -= 0x1000;
+        cartridgeSlot.NotifyPpuAddress(address, _ppuCycle);
+    }
+
+    private void ObservePpuAddress(ushort address)
+    {
+        if (address <= 0x2FFF)
+            cartridgeSlot.NotifyPpuAddress(address, _ppuCycle);
+        else if (address <= 0x3EFF)
+            cartridgeSlot.NotifyPpuAddress((ushort)(address - 0x1000), _ppuCycle);
     }
 }
