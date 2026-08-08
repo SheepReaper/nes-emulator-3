@@ -422,7 +422,11 @@ public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandar
         var phase = (_cycle - 257) & 0x07;
         if (slot >= _spriteCount)
         {
-            if (phase is 4 or 6) _ = _bus!.Read((ushort)(phase == 4 ? 0x0000 : 0x0008));
+            if (phase is 4 or 6)
+            {
+                var dummyPatternAddress = GetSpritePatternAddress(0xFF, 0);
+                _ = _bus!.Read((ushort)(dummyPatternAddress + (phase == 6 ? 8 : 0)));
+            }
             return;
         }
 

@@ -67,7 +67,7 @@ public sealed class Mmc3Cart : Cartridge
             case 0x8001: _bankRegisters[_bankSelect & 0x07] = value; break;
             case 0xA000:
                 if (!_fourScreenMirroring)
-                    NametableMirroring = (value & 1) == 0 ? NametableMirroring.Horizontal : NametableMirroring.Vertical;
+                    NametableMirroring = (value & 1) == 0 ? NametableMirroring.Vertical : NametableMirroring.Horizontal;
                 break;
             case 0xA001:
                 _prgRamEnabled = (value & 0x80) != 0;
