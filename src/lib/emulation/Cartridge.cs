@@ -23,6 +23,7 @@ public abstract class Cartridge(
     public virtual byte CpuPeek(ushort address) => CpuRead(address);
     public virtual byte PpuPeek(ushort address) => PpuRead(address);
     internal virtual void NotifyPpuAddress(ushort address, ulong ppuCycle) { }
+    internal virtual void NotifyCpuClock() { }
     internal virtual void Reset() { }
 
     internal int PrgRomSize => _prgRom.Length;
