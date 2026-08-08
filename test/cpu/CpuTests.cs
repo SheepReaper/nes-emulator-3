@@ -1349,6 +1349,22 @@ public class CpuTests
         Assert.Equal(0x22, GetA());
     }
 
+    [Fact]
+    public void ZeroPageIncrementWritesOnTheInstructionsFinalCycle()
+    {
+        _bus.Load(0x8000, [0xE6, 0x10]);
+        _bus.Write(0x0010, 0x41);
+        SetPc(0x8000);
+        SetCycles(0);
+
+        Clock(4);
+        Assert.Equal(0x41, _bus.Read(0x0010));
+
+        _cpu.Clock();
+
+        Assert.Equal(0x42, _bus.Read(0x0010));
+    }
+
 
     [Theory]
     [InlineData(false, 0x9000, true)]  // IRQ when I flag is clear: should trigger
@@ -2192,6 +2208,26 @@ public class CpuTests
         Assert.Equal(2UL, _cpu.Step());
         Assert.Equal(1, GetX());
         Assert.Equal(0x8001, GetPc());
+    }
+
+    [Fact]
+    public void IrqFirstAssertedAtInstructionBoundaryWaitsThroughTheNextInstruction()
+    {
+        _bus.Load(0x8000, [0xEA, 0xEA]);
+        _bus.Write(0xFFFE, 0x00);
+        _bus.Write(0xFFFF, 0x90);
+        SetPc(0x8000);
+        SetP(0);
+        SetCycles(0);
+        _interrupts.Irq = true;
+
+        Clock(2);
+
+        Assert.Equal(0x8001, GetPc());
+
+        _cpu.Clock();
+
+        Assert.Equal(0x9000, GetPc());
     }
 
     [Fact]

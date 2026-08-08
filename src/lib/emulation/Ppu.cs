@@ -48,6 +48,7 @@ public sealed class Ppu(
     private int _scanline;
     private int _cycle;
     private bool _oddFrame;
+    private bool _oddFrameSkipRenderingEnabled;
     private bool _suppressVblank;
     private int _vblankNmiDelayDots;
     private bool _hasPublishedFrame;
@@ -90,6 +91,7 @@ public sealed class Ppu(
         _scanline = 0;
         _cycle = 0;
         _oddFrame = false;
+        _oddFrameSkipRenderingEnabled = false;
         _suppressVblank = false;
         _vblankNmiDelayDots = 0;
         FrameNumber = 0;
@@ -213,8 +215,12 @@ public sealed class Ppu(
 
     private void AdvanceTiming(int preRenderScanline, bool renderingEnabled)
     {
+        if (videoStandard == NesVideoStandard.Ntsc && _oddFrame &&
+            _scanline == preRenderScanline && _cycle == _timing.DotsPerScanline - 3)
+            _oddFrameSkipRenderingEnabled = renderingEnabled;
+
         // NTSC omits the final pre-render dot on odd frames while rendering.
-        if (videoStandard == NesVideoStandard.Ntsc && _oddFrame && renderingEnabled &&
+        if (videoStandard == NesVideoStandard.Ntsc && _oddFrame && _oddFrameSkipRenderingEnabled &&
             _scanline == preRenderScanline && _cycle == _timing.DotsPerScanline - 2)
         {
             _cycle = 0;
@@ -287,6 +293,12 @@ public sealed class Ppu(
                         ((_vramAddress >> 4) & 0x38) | ((_vramAddress >> 2) & 0x07)));
                     var shift = (int)(((_vramAddress >> 4) & 0x04) | (_vramAddress & 0x02));
                     _nextTileAttribute = (byte)((attribute >> shift) & 0x03);
+                    break;
+                case 3:
+                    // Pattern fetches present their address one dot before the
+                    // data read. Mapper IRQ hardware observes this A12 phase.
+                    if (_bus is PpuBus ppuBus)
+                        ppuBus.NotifyPpuAddress(GetBackgroundPatternAddress(0));
                     break;
                 case 4:
                     _nextTileLow = _bus!.Read(GetBackgroundPatternAddress(0));
@@ -455,16 +467,16 @@ public sealed class Ppu(
         var phase = (_cycle - 257) & 0x07;
         if (slot >= _spriteCount)
         {
-            if (phase is 4 or 6)
+            if (phase is 3 or 5)
             {
                 var dummyPatternAddress = GetSpritePatternAddress(0xFF, 0);
-                _ = _bus!.Read((ushort)(dummyPatternAddress + (phase == 6 ? 8 : 0)));
+                _ = _bus!.Read((ushort)(dummyPatternAddress + (phase == 5 ? 8 : 0)));
             }
             return;
         }
 
-        if (phase == 4) _sprites[slot].PatternLow = _bus!.Read(_sprites[slot].PatternAddress);
-        if (phase == 6) _sprites[slot].PatternHigh = _bus!.Read((ushort)(_sprites[slot].PatternAddress + 8));
+        if (phase == 3) _sprites[slot].PatternLow = _bus!.Read(_sprites[slot].PatternAddress);
+        if (phase == 5) _sprites[slot].PatternHigh = _bus!.Read((ushort)(_sprites[slot].PatternAddress + 8));
     }
 
     private ushort GetSpritePatternAddress(byte tile, int row)

@@ -6,7 +6,6 @@ public sealed class Mmc3Cart : Cartridge
 {
     private const int PrgBankSize = 0x2000;
     private const int ChrBankSize = 0x0400;
-    private const ulong A12LowFilterCycles = 8;
 
     private readonly InterruptLines _interrupts;
     private readonly byte[] _bankRegisters = new byte[8];
@@ -20,8 +19,7 @@ public sealed class Mmc3Cart : Cartridge
     private bool _irqReload;
     private bool _irqEnabled;
     private bool _a12High;
-    private bool _observedA12Low;
-    private ulong _a12LowCycle;
+    private int _a12LowCpuClocks;
 
     public Mmc3Cart(
         byte[] prgRom,
@@ -102,15 +100,21 @@ public sealed class Mmc3Cart : Cartridge
         var a12High = (address & 0x1000) != 0;
         if (!a12High)
         {
-            if (_a12High || !_observedA12Low) _a12LowCycle = ppuCycle;
+            if (_a12High) _a12LowCpuClocks = 0;
             _a12High = false;
-            _observedA12Low = true;
             return;
         }
 
-        if (!_a12High && _observedA12Low &&
-            ppuCycle - _a12LowCycle >= A12LowFilterCycles) ClockIrqCounter();
+        if (!_a12High && _a12LowCpuClocks >= 4)
+        {
+            ClockIrqCounter();
+        }
         _a12High = true;
+    }
+
+    internal override void NotifyCpuClock()
+    {
+        if (!_a12High && _a12LowCpuClocks < 4) _a12LowCpuClocks++;
     }
 
     internal override void Reset()
@@ -124,7 +128,7 @@ public sealed class Mmc3Cart : Cartridge
         _irqReload = false;
         _irqEnabled = false;
         _a12High = false;
-        _observedA12Low = false;
+        _a12LowCpuClocks = 0;
         _interrupts.MapperIrq = false;
     }
 
@@ -182,6 +186,9 @@ public sealed class Mmc3Cart : Cartridge
             _irqCounter--;
         }
 
-        if (_irqCounter == 0 && _irqEnabled) _interrupts.MapperIrq = true;
+        if (_irqCounter == 0 && _irqEnabled)
+        {
+            _interrupts.MapperIrq = true;
+        }
     }
 }

@@ -175,6 +175,7 @@ public sealed class Nes
         {
             _cpuClockAccumulator -= Timing.CpuDivisor;
             _cpu.Clock(_cpuClockCounter++);
+            _cartridgeSlot.NotifyCpuClock();
         }
 
     }

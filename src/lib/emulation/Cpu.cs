@@ -26,6 +26,7 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     private ulong _totalCyclesExecuted;
     private bool _nmiPending;
     private bool _delayPendingNmiOneInstruction;
+    private bool _irqPending;
     private bool _deferIrqOneInstruction;
     private Action? _endOfInstructionAction;
 
@@ -52,6 +53,7 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
         _nmiPending = false;
         _ = _interrupts.ConsumeNmiEdge();
         _delayPendingNmiOneInstruction = false;
+        _irqPending = false;
         _deferIrqOneInstruction = false;
         _endOfInstructionAction = null;
 
@@ -93,11 +95,11 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
                 }
             }
 
-            var deferIrq = _deferIrqOneInstruction;
             _deferIrqOneInstruction = false;
-            if (_interrupts.Irq && !_p.InterruptDisable && !deferIrq)
+            if (_irqPending)
             {
                 HandleIrq();
+                _irqPending = false;
                 // The IRQ line is not cleared by the CPU, but by the device that asserted it.
                 _cycles--;
                 _totalCyclesExecuted++;
@@ -415,6 +417,12 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
             _endOfInstructionAction = null;
             action();
         }
+
+        // The 2A03 polls IRQ on the penultimate instruction cycle. For a
+        // two-cycle instruction this is the opcode-fetch cycle, so an IRQ that
+        // arrives during its final cycle is not serviced until one instruction later.
+        if (_cycles == 2)
+            _irqPending = _interrupts.Irq && !_p.InterruptDisable && !_deferIrqOneInstruction;
 
         // The CPU always consumes one cycle per clock tick.
         // If a new instruction was fetched, _cycles now holds the remaining duration.
@@ -1004,7 +1012,17 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     }
 
     // INC (Increment Memory)
-    private void INC_ZP() { ushort addr = Addr_ZP(); byte val = (byte)(Read(addr) + 1); Write(addr, val); SetZeroAndNegativeFlags(val); _cycles = 5; }
+    private void INC_ZP()
+    {
+        var address = Addr_ZP();
+        _cycles = 5;
+        _endOfInstructionAction = () =>
+        {
+            var value = (byte)(Read(address) + 1);
+            Write(address, value);
+            SetZeroAndNegativeFlags(value);
+        };
+    }
     private void INC_ZPX() { ushort addr = Addr_ZPX(); byte val = (byte)(Read(addr) + 1); Write(addr, val); SetZeroAndNegativeFlags(val); _cycles = 6; }
     private void INC_ABS() { ushort addr = Addr_ABS(); byte val = (byte)(Read(addr) + 1); Write(addr, val); SetZeroAndNegativeFlags(val); _cycles = 6; }
     private void INC_ABSX() { ushort addr = Addr_ABSX_Write(); byte val = (byte)(Read(addr) + 1); Write(addr, val); SetZeroAndNegativeFlags(val); _cycles = 7; }

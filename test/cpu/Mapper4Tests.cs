@@ -112,7 +112,7 @@ public sealed class Mapper4Tests
     }
 
     [Fact]
-    public void IrqCounter_IgnoresA12RiseBeforeEightLowPpuCycles()
+    public void IrqCounter_IgnoresA12RiseBeforeThreeCompleteLowCpuClocks()
     {
         var interrupts = new InterruptLines();
         var cartridge = CreateCartridge(interrupts: interrupts);
@@ -120,7 +120,9 @@ public sealed class Mapper4Tests
         cartridge.CpuWrite(0xC001, 0);
         cartridge.CpuWrite(0xE001, 0);
 
-        ClockA12(cartridge, 0, 7);
+        ClockA12Low(cartridge, 0);
+        ClockCpuFilter(cartridge, 3);
+        NotifyA12High(cartridge, 7);
 
         Assert.False(interrupts.Irq);
     }
@@ -140,7 +142,11 @@ public sealed class Mapper4Tests
         ppu.Write(0x2000, 0x08);
         ppu.Write(0x2001, 0x18);
 
-        for (var dot = 0; dot < 341 * 3 && !interrupts.Irq; dot++) ppu.Clock();
+        for (var dot = 0; dot < 341 * 3 && !interrupts.Irq; dot++)
+        {
+            ppu.Clock();
+            if (dot % 3 == 2) ClockCpuFilter(cartridge, 1);
+        }
 
         Assert.True(interrupts.Irq);
     }
@@ -163,7 +169,67 @@ public sealed class Mapper4Tests
         ppu.Write(0x2000, 0x08); // Background at $0000, sprites at $1000.
         ppu.Write(0x2001, 0x18);
 
-        for (var dot = 0; dot < 341 * 3 && !interrupts.Irq; dot++) ppu.Clock();
+        for (var dot = 0; dot < 341 * 3 && !interrupts.Irq; dot++)
+        {
+            ppu.Clock();
+            if (dot % 3 == 2) ClockCpuFilter(cartridge, 1);
+        }
+
+        Assert.True(interrupts.Irq);
+    }
+
+    [Fact]
+    public void SpritePatternTableA12RiseClocksIrqOnPpuDot260()
+    {
+        var interrupts = new InterruptLines();
+        var cartridge = CreateCartridge(interrupts: interrupts);
+        var slot = new CartridgeSlot();
+        slot.Insert(cartridge);
+        var ppu = new Ppu(interrupts);
+        ppu.ConnectBus(new PpuBus(slot));
+        ppu.Reset();
+        cartridge.CpuWrite(0xC000, 0);
+        cartridge.CpuWrite(0xC001, 0);
+        cartridge.CpuWrite(0xE001, 0);
+        ppu.Write(0x2000, 0x08);
+        ppu.Write(0x2001, 0x18);
+
+        for (var dot = 0; dot < 260; dot++)
+        {
+            ppu.Clock();
+            if (dot % 3 == 2) ClockCpuFilter(cartridge, 1);
+        }
+        Assert.False(interrupts.Irq);
+
+        ppu.Clock();
+
+        Assert.True(interrupts.Irq);
+    }
+
+    [Fact]
+    public void BackgroundPatternTableA12RiseUsesTheAddressPresentationDot()
+    {
+        var interrupts = new InterruptLines();
+        var cartridge = CreateCartridge(interrupts: interrupts);
+        var slot = new CartridgeSlot();
+        slot.Insert(cartridge);
+        var ppu = new Ppu(interrupts);
+        ppu.ConnectBus(new PpuBus(slot));
+        ppu.Reset();
+        cartridge.CpuWrite(0xC000, 0);
+        cartridge.CpuWrite(0xC001, 0);
+        cartridge.CpuWrite(0xE001, 0);
+        ppu.Write(0x2000, 0x10);
+        ppu.Write(0x2001, 0x18);
+
+        for (var dot = 0; dot < 324; dot++)
+        {
+            ppu.Clock();
+            if (dot % 3 == 2) ClockCpuFilter(cartridge, 1);
+        }
+        Assert.False(interrupts.Irq);
+
+        ppu.Clock();
 
         Assert.True(interrupts.Irq);
     }
@@ -202,6 +268,7 @@ public sealed class Mapper4Tests
         ppu.Write(0x2006, 0x0F);
         ppu.Write(0x2006, 0xFF);
         for (var dot = 0; dot < 8; dot++) ppu.Clock();
+        ClockCpuFilter(cartridge, 4);
 
         _ = ppu.Read(0x2007);
 
@@ -272,14 +339,26 @@ public sealed class Mapper4Tests
 
     private static void ClockA12(Cartridge cartridge, ulong lowCycle, ulong highCycle)
     {
-        var notify = typeof(Cartridge).GetMethod("NotifyPpuAddress", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        notify.Invoke(cartridge, [ushort.MinValue, lowCycle]);
-        notify.Invoke(cartridge, [(ushort)0x1000, highCycle]);
+        ClockA12Low(cartridge, lowCycle);
+        ClockCpuFilter(cartridge, 4);
+        NotifyA12High(cartridge, highCycle);
     }
 
     private static void ClockA12Low(Cartridge cartridge, ulong cycle)
     {
         var notify = typeof(Cartridge).GetMethod("NotifyPpuAddress", BindingFlags.Instance | BindingFlags.NonPublic)!;
         notify.Invoke(cartridge, [ushort.MinValue, cycle]);
+    }
+
+    private static void NotifyA12High(Cartridge cartridge, ulong cycle)
+    {
+        var notify = typeof(Cartridge).GetMethod("NotifyPpuAddress", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        notify.Invoke(cartridge, [(ushort)0x1000, cycle]);
+    }
+
+    private static void ClockCpuFilter(Cartridge cartridge, int clocks)
+    {
+        var notify = typeof(Cartridge).GetMethod("NotifyCpuClock", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        for (var clock = 0; clock < clocks; clock++) notify.Invoke(cartridge, null);
     }
 }

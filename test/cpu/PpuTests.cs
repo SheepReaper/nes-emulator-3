@@ -342,6 +342,39 @@ public sealed class PpuTests
     }
 
     [Fact]
+    public void OddFrameSkipSamplesRenderingEnableOneDotBeforeTheSkip()
+    {
+        var ppu = CreatePpu(out _);
+        SetPrivateField(ppu, "_oddFrame", true);
+        SetPrivateField(ppu, "_scanline", 261);
+        SetPrivateField(ppu, "_cycle", 338);
+
+        ppu.Clock();
+        ppu.Write(0x2001, 0x08);
+        ppu.Clock();
+
+        Assert.Equal(261, GetPrivateField<int>(ppu, "_scanline"));
+        Assert.Equal(340, GetPrivateField<int>(ppu, "_cycle"));
+    }
+
+    [Fact]
+    public void OddFrameSkipStillOccursWhenRenderingIsDisabledAfterItsSampleDot()
+    {
+        var ppu = CreatePpu(out _);
+        SetPrivateField(ppu, "_oddFrame", true);
+        SetPrivateField(ppu, "_scanline", 261);
+        SetPrivateField(ppu, "_cycle", 338);
+        ppu.Write(0x2001, 0x08);
+
+        ppu.Clock();
+        ppu.Write(0x2001, 0x00);
+        ppu.Clock();
+
+        Assert.Equal(0, GetPrivateField<int>(ppu, "_scanline"));
+        Assert.Equal(0, GetPrivateField<int>(ppu, "_cycle"));
+    }
+
+    [Fact]
     public void MoreThanEightSpritesOnTheNextScanlineSetsOverflow()
     {
         var ppu = CreatePpu(out _);
@@ -495,6 +528,12 @@ public sealed class PpuTests
         ppu.Write(0x2006, (byte)(address >> 8));
         ppu.Write(0x2006, (byte)address);
     }
+
+    private static void SetPrivateField<T>(Ppu ppu, string name, T value) =>
+        typeof(Ppu).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(ppu, value);
+
+    private static T GetPrivateField<T>(Ppu ppu, string name) =>
+        (T)typeof(Ppu).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(ppu)!;
 
     private sealed class MemoryBus : IBus
     {
