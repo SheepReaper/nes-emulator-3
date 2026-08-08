@@ -24,7 +24,6 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     private byte _opcode;           // Current opcode being executed
     private ulong _masterClock;     // Tracks the master clock for odd/even cycle checks
     private ulong _totalCyclesExecuted;
-    private bool _nmiInputHigh;
     private bool _nmiPending;
     private bool _delayPendingNmiOneInstruction;
     private bool _deferIrqOneInstruction;
@@ -50,8 +49,8 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
         // Set I flag, clear others. Bit 5 is unused and always 1.
         _p.Value = 0b0010_0100;
 
-        _nmiInputHigh = false;
         _nmiPending = false;
+        _ = _interrupts.ConsumeNmiEdge();
         _delayPendingNmiOneInstruction = false;
         _deferIrqOneInstruction = false;
         _endOfInstructionAction = null;
@@ -64,14 +63,16 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     {
         _masterClock = masterClock;
 
-        if (_interrupts.Nmi && !_nmiInputHigh)
+        if (_interrupts.ConsumeNmiEdge())
         {
             _nmiPending = true;
-            _delayPendingNmiOneInstruction = _interrupts.DelayNmiOneInstruction;
+            // The 2A03 polls the latched NMI state before an instruction's final
+            // cycle. An edge first observed at the following instruction boundary
+            // has missed that poll, so the next opcode must execute before the NMI
+            // sequence begins.
+            _delayPendingNmiOneInstruction = _interrupts.DelayNmiOneInstruction || _cycles == 0;
             _interrupts.DelayNmiOneInstruction = false;
         }
-        _nmiInputHigh = _interrupts.Nmi;
-
         if (_cycles == 0)
         {
             // Check for interrupts before fetching the next instruction
@@ -86,7 +87,6 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
                     HandleNmi();
                     _nmiPending = false;
                     _interrupts.Nmi = false;
-                    _nmiInputHigh = false;
                     _cycles--;
                     _totalCyclesExecuted++;
                     return;

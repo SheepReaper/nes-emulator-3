@@ -1221,10 +1221,10 @@ public class CpuTests
         SetSp(0xFD);
         SetP(0b10000101); // Set N, C, and I flags to prove NMI ignores I
         _interrupts.Nmi = true;
-        SetCycles(0); // Set cycles to 0 to ensure the next clock polls for interrupts
+        SetCycles(1); // Assert the edge before the current instruction's final interrupt poll.
 
         // Act
-        Clock(7);
+        Clock(8);
 
         // Assert
         Assert.Equal(0x9000, GetPc()); // PC is at the interrupt handler
@@ -1237,6 +1237,27 @@ public class CpuTests
         Assert.Equal(0x00, _bus.Read(0x01FC)); // Low byte of return address
         // Status pushed with B flag (bit 4) clear
         Assert.Equal(0b10100101, _bus.Read(0x01FB));
+    }
+
+    [Fact]
+    public void NmiEdgeFirstObservedAtInstructionBoundaryWaitsThroughTheNextInstruction()
+    {
+        _bus.Load(0x8000, [0xEA, 0xEA]);
+        _bus.Write(0xFFFA, 0x00);
+        _bus.Write(0xFFFB, 0x90);
+        SetPc(0x8000);
+        SetCycles(0);
+        _interrupts.Nmi = true;
+
+        Clock(2);
+
+        Assert.Equal(0x8001, GetPc());
+        Assert.True(_interrupts.Nmi);
+
+        _cpu.Clock();
+
+        Assert.Equal(0x9000, GetPc());
+        Assert.False(_interrupts.Nmi);
     }
 
     [Fact]
@@ -1977,9 +1998,11 @@ public class CpuTests
         SetPc(0x8000);
         SetSp(0xFD);
         SetP(0);
+        SetCycles(1);
         _interrupts.Nmi = true;
         _interrupts.Irq = true;
 
+        _cpu.Clock();
         Assert.Equal(7UL, _cpu.Step());
         Assert.Equal(0x9000, GetPc());
         Assert.False(_interrupts.Nmi);

@@ -124,7 +124,6 @@ public sealed class Ppu(
                 {
                     _vblankNmiDelayDots = 0;
                     interrupts.Nmi = true;
-                    // CPU writes are applied at the beginning of the instruction in this functional core.
                     // A physical STA changes PPUCTRL on its final cycle, after the interrupt poll, so the
                     // instruction following the STA completes before this immediate NMI is recognized.
                     interrupts.DelayNmiOneInstruction = true;
@@ -166,6 +165,7 @@ public sealed class Ppu(
         // Timing and fetch phases: https://www.nesdev.org/wiki/PPU_rendering
         Debug.Assert(_bus != null, "PPU bus is not connected.");
         if (_bus is PpuBus ppuBus) ppuBus.AdvanceCycle();
+        interrupts.AdvancePpuDot();
         var preRenderScanline = _timing.ScanlinesPerFrame - 1;
         var renderingEnabled = IsRenderingEnabled;
 
@@ -179,6 +179,9 @@ public sealed class Ppu(
             _ppuStatus.Sprite0Hit = false;
             _ppuStatus.SpriteOverflow = false;
             interrupts.Nmi = false;
+            // A PPUCTRL enable that overlaps the pre-render clear creates a pulse
+            // too short to reach the CPU's NMI polling latch.
+            interrupts.CancelShortNmiEdge(2);
             _vblankNmiDelayDots = 0;
             _suppressVblank = false;
         }
