@@ -254,7 +254,7 @@ public sealed class PpuTests
     }
 
     [Fact]
-    public void StatusReadImmediatelyBeforeVblankSuppressesThatFramesFlag()
+    public void StatusReadOneDotBeforeVblankDoesNotSuppressThatFramesFlag()
     {
         var ppu = CreatePpu(out _);
         for (var i = 0; i < 241 * 341; i++) ppu.Clock();
@@ -262,6 +262,18 @@ public sealed class PpuTests
         Assert.Equal(0, ppu.Read(0x2002) & 0x80);
         ppu.Clock();
         ppu.Clock();
+        Assert.NotEqual(0, ppu.Read(0x2002) & 0x80);
+    }
+
+    [Fact]
+    public void StatusReadOnTheVblankSetDotSuppressesThatFramesFlag()
+    {
+        var ppu = CreatePpu(out _);
+        for (var i = 0; i < (241 * 341) + 1; i++) ppu.Clock();
+
+        Assert.Equal(0, ppu.Read(0x2002) & 0x80);
+        ppu.Clock();
+
         Assert.Equal(0, ppu.Read(0x2002) & 0x80);
     }
 
@@ -278,6 +290,25 @@ public sealed class PpuTests
         Assert.True(interrupts.Nmi);
         Assert.NotEqual(0, ppu.Read(0x2002) & 0x80);
         Assert.False(interrupts.Nmi);
+    }
+
+    [Fact]
+    public void VblankNmiOutputIsDelayedTwoPpuDotsAfterTheStatusFlagIsSet()
+    {
+        var interrupts = new InterruptLines();
+        var ppu = new Ppu(interrupts);
+        ppu.ConnectBus(new MemoryBus());
+        ppu.Reset();
+        ppu.Write(0x2000, 0x80);
+        for (var i = 0; i < (241 * 341) + 2; i++) ppu.Clock();
+
+        Assert.False(interrupts.Nmi);
+
+        ppu.Clock();
+        Assert.False(interrupts.Nmi);
+
+        ppu.Clock();
+        Assert.True(interrupts.Nmi);
     }
 
     [Fact]
