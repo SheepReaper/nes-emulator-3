@@ -320,6 +320,45 @@ public sealed class PpuTests
         Assert.NotEqual(0, ppu.Read(0x2002) & 0x40);
     }
 
+    [Fact]
+    public void BackgroundPrefetch_RendersTheFirstVisibleTileFromTheCurrentNametableRow()
+    {
+        var ppu = CreatePpu(out var bus);
+        for (var index = 0; index < 30 * 32; index++) bus.Memory[0x2000 + index] = 1;
+        for (var row = 0; row < 30; row++)
+        {
+            bus.Memory[0x2000 + (row * 32) + 1] = 2;
+            bus.Memory[0x2000 + (row * 32) + 31] = 3;
+        }
+        for (var patternRow = 0; patternRow < 8; patternRow++)
+        {
+            bus.Memory[0x0010 + patternRow] = 0xFF; // Tile 1: palette pixel 1.
+            bus.Memory[0x0028 + patternRow] = 0xFF; // Tile 2: palette pixel 2.
+            bus.Memory[0x0030 + patternRow] = 0xFF; // Tile 3: palette pixel 3.
+            bus.Memory[0x0038 + patternRow] = 0xFF;
+        }
+        bus.Memory[0x3F00] = 0x0F;
+        bus.Memory[0x3F01] = 0x30;
+        bus.Memory[0x3F02] = 0x16;
+        bus.Memory[0x3F03] = 0x12;
+        ppu.Write(0x2001, 0x0A); // Background and its leftmost eight pixels enabled.
+        ppu.Write(0x2005, 3);
+        ppu.Write(0x2005, 0);
+
+        for (var clock = 0; clock < 341 * 262 * 2; clock++) ppu.Clock();
+
+        var frame = Assert.IsType<byte[]>(typeof(Ppu)
+            .GetField("_publishedFrame", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(ppu));
+        var firstPixel = frame.AsSpan((20 * Nes.FrameWidth) * 4, 4).ToArray();
+        var firstPixelOfSecondTile = frame.AsSpan(((20 * Nes.FrameWidth) + 5) * 4, 4).ToArray();
+        var knownFirstTilePixel = frame.AsSpan(((20 * Nes.FrameWidth) + 16) * 4, 4).ToArray();
+        var knownSecondTilePixel = frame.AsSpan(((20 * Nes.FrameWidth) + 8) * 4, 4).ToArray();
+        Assert.Equal(knownFirstTilePixel, firstPixel);
+        Assert.Equal(knownSecondTilePixel, firstPixelOfSecondTile);
+        Assert.NotEqual(firstPixel, firstPixelOfSecondTile);
+    }
+
     private static byte[] CreateSolidBackgroundRom(byte mask = 0x0A, byte paletteColor = 0x30)
     {
         var rom = new byte[16 + 0x4000 + 0x2000];

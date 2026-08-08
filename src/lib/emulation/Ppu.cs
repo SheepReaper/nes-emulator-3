@@ -170,13 +170,13 @@ public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandar
             _suppressVblank = false;
         }
 
-        if (_scanline < FrameHeight && _cycle is >= 1 and <= 256) RenderPixel(_cycle - 1, _scanline);
-
         if ((_scanline < FrameHeight || _scanline == preRenderScanline) && renderingEnabled)
         {
             ClockBackgroundPipeline(preRenderScanline);
             if (_cycle is >= 257 and <= 320) ClockSpriteFetches();
         }
+
+        if (_scanline < FrameHeight && _cycle is >= 1 and <= 256) RenderPixel(_cycle - 1, _scanline);
 
         var completedFrame = _scanline == 239 && _cycle == 340 ? PublishFrame() : (ulong?)null;
         AdvanceTiming(preRenderScanline, renderingEnabled);
@@ -245,7 +245,7 @@ public sealed class Ppu(InterruptLines interrupts, NesVideoStandard videoStandar
 
     private void ClockBackgroundPipeline(int preRenderScanline)
     {
-        if ((_cycle is >= 2 and <= 257) || (_cycle is >= 322 and <= 337))
+        if ((_cycle is >= 2 and <= 257) || (_cycle is >= 321 and <= 337))
         {
             ShiftBackgroundRegisters();
             switch ((_cycle - 1) & 0x07)
