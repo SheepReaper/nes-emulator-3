@@ -57,9 +57,9 @@ public sealed class Mapper4Tests
     public void MirroringRegister_ChangesMirroringUnlessFourScreenIsHardwired()
     {
         var cartridge = CreateCartridge();
-        cartridge.CpuWrite(0xA000, 1);
-        Assert.Equal(NametableMirroring.Vertical, cartridge.NametableMirroring);
         cartridge.CpuWrite(0xA000, 0);
+        Assert.Equal(NametableMirroring.Vertical, cartridge.NametableMirroring);
+        cartridge.CpuWrite(0xA000, 1);
         Assert.Equal(NametableMirroring.Horizontal, cartridge.NametableMirroring);
 
         var fourScreen = CreateCartridge(fourScreen: true);
@@ -128,6 +128,29 @@ public sealed class Mapper4Tests
         cartridge.CpuWrite(0xC001, 0);
         cartridge.CpuWrite(0xE001, 0);
         ppu.Write(0x2000, 0x08);
+        ppu.Write(0x2001, 0x18);
+
+        for (var dot = 0; dot < 341 * 3 && !interrupts.Irq; dot++) ppu.Clock();
+
+        Assert.True(interrupts.Irq);
+    }
+
+    [Fact]
+    public void EmptySpriteSlots_StillFetchFromTheSelectedSpritePatternTableAndClockIrq()
+    {
+        var interrupts = new InterruptLines();
+        var cartridge = CreateCartridge(interrupts: interrupts);
+        var slot = new CartridgeSlot();
+        slot.Insert(cartridge);
+        var ppu = new Ppu(interrupts);
+        ppu.ConnectBus(new PpuBus(slot));
+        ppu.Reset();
+        ppu.Write(0x2003, 0);
+        for (var index = 0; index < 256; index++) ppu.Write(0x2004, 0xFF);
+        cartridge.CpuWrite(0xC000, 1);
+        cartridge.CpuWrite(0xC001, 0);
+        cartridge.CpuWrite(0xE001, 0);
+        ppu.Write(0x2000, 0x08); // Background at $0000, sprites at $1000.
         ppu.Write(0x2001, 0x18);
 
         for (var dot = 0; dot < 341 * 3 && !interrupts.Irq; dot++) ppu.Clock();
