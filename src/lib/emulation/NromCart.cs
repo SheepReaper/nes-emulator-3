@@ -10,15 +10,18 @@ public class NromCart(
     : Cartridge(prgRom, chrRom, nametableMirroring, chrWritable)
 {
     private readonly int _prgAddressMask = prgRom.Length - 1;
+    private readonly byte[] _prgRam = new byte[0x2000];
 
     public override byte CpuRead(ushort address)
     {
+        if (address is >= 0x6000 and <= 0x7FFF) return _prgRam[address - 0x6000];
         if (address < 0x8000) return 0;
         return _prgRom[(address - 0x8000) & _prgAddressMask];
     }
 
     public override void CpuWrite(ushort address, byte value)
     {
+        if (address is >= 0x6000 and <= 0x7FFF) _prgRam[address - 0x6000] = value;
     }
 
     public override byte PpuRead(ushort address) =>
@@ -28,4 +31,10 @@ public class NromCart(
     {
         if (address <= 0x1FFF && IsChrWritable) _chrRom[address] = value;
     }
+
+    internal override int CartridgeRamSize => _prgRam.Length;
+    internal override void CopyCartridgeRam(int offset, Span<byte> destination) =>
+        _prgRam.AsSpan(offset, destination.Length).CopyTo(destination);
+    internal override void WriteCartridgeRam(int offset, ReadOnlySpan<byte> source) =>
+        source.CopyTo(_prgRam.AsSpan(offset, source.Length));
 }

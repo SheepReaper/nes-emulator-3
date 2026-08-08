@@ -42,6 +42,18 @@ public sealed class NromCartTests
         Assert.Equal(3, cartridge.CpuRead(0xE000));
     }
 
+    [Fact]
+    public void CartridgeRam_IsReadableAndWritableAt6000Through7fff()
+    {
+        var cartridge = new CartridgeFactory().Create(CreateRom(2));
+
+        cartridge.CpuWrite(0x6000, 0x12);
+        cartridge.CpuWrite(0x7FFF, 0x34);
+
+        Assert.Equal(0x12, cartridge.CpuRead(0x6000));
+        Assert.Equal(0x34, cartridge.CpuRead(0x7FFF));
+    }
+
     private static byte[] CreateRom(byte prgBanks)
     {
         var rom = new byte[16 + prgBanks * 0x4000 + 0x2000];

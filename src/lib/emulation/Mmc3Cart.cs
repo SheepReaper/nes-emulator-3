@@ -32,8 +32,8 @@ public sealed class Mmc3Cart : Cartridge
         : base(prgRom, chrRom, nametableMirroring, chrWritable)
     {
         if (interrupts == null) throw new ArgumentNullException(nameof(interrupts));
-        if (prgRom.Length < PrgBankSize * 4 || prgRom.Length % PrgBankSize != 0)
-            throw new ArgumentException("MMC3 PRG ROM must contain at least four complete 8 KB banks.", nameof(prgRom));
+        if (prgRom.Length < PrgBankSize * 2 || prgRom.Length % PrgBankSize != 0)
+            throw new ArgumentException("MMC3 PRG ROM must contain at least two complete 8 KB banks.", nameof(prgRom));
         if (chrRom.Length == 0 || chrRom.Length % ChrBankSize != 0)
             throw new ArgumentException("MMC3 CHR memory must contain complete 1 KB banks.", nameof(chrRom));
 
