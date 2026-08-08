@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "EmuSheep (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "EmuSheep (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

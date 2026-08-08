@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="EmuSheep.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:EmuSheep"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Padding="24" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Spacing="2">
+                <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="EmuSheep" />
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="NES emulator"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Button
+                x:Name="OpenRomButton"
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Click="OpenRomButton_Click"
+                Content="Open ROM" />
+        </Grid>
+
+        <InfoBar
+            x:Name="ErrorInfoBar"
+            Grid.Row="1"
+            IsClosable="True"
+            IsOpen="False"
+            Severity="Error"
+            Title="Could not load the ROM" />
+
+        <Border
+            Grid.Row="2"
+            MinHeight="240"
+            Background="Black"
+            CornerRadius="8">
+            <Viewbox HorizontalAlignment="Stretch" Stretch="Uniform" VerticalAlignment="Stretch">
+                <Grid Width="256" Height="240">
+                    <Image
+                        x:Name="NesDisplay"
+                        Width="256"
+                        Height="240"
+                        AutomationProperties.Name="NES video output"
+                        Stretch="Fill" />
+                    <StackPanel
+                        x:Name="EmptyState"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="8">
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            Foreground="White"
+                            FontSize="18"
+                            FontWeight="SemiBold"
+                            Text="No ROM loaded" />
+                        <TextBlock
+                            Foreground="#B3FFFFFF"
+                            Text="Open a Mapper 0 .nes file to begin"
+                            TextAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+            </Viewbox>
+        </Border>
+
+        <Grid Grid.Row="3" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <ProgressRing
+                x:Name="LoadingIndicator"
+                Width="16"
+                Height="16"
+                IsActive="False" />
+            <TextBlock
+                x:Name="StatusText"
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                AutomationProperties.LiveSetting="Polite"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="No ROM loaded"
+                TextTrimming="CharacterEllipsis" />
+        </Grid>
+    </Grid>
+</Page>

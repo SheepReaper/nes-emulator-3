@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\emulator-winui\RgbaToBgraConverter.cs" Link="RgbaToBgraConverter.cs" />
+    <Compile Include="..\..\src\emulator-winui\NesEmulationSession.cs" Link="NesEmulationSession.cs" />
+    <Compile Include="..\..\src\emulator-winui\StartupRomOptions.cs" Link="StartupRomOptions.cs" />
+    <Compile Include="..\..\src\emulator-winui\InitialWindowLayout.cs" Link="InitialWindowLayout.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\lib\emulation\SR.Emulation.Nes.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.runner.visualstudio">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="xunit.v3.mtp-v2" />
+  </ItemGroup>
+</Project>

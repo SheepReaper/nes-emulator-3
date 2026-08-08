@@ -33,4 +33,9 @@ public sealed class CartridgeSlot
     {
         Cartridge?.PpuWrite(address, value);
     }
+
+    public byte CpuPeek(ushort address) => Cartridge?.CpuPeek(address) ?? 0;
+    public byte PpuPeek(ushort address) => Cartridge?.PpuPeek(address) ?? 0;
+    internal void NotifyPpuAddress(ushort address, ulong ppuCycle) =>
+        Cartridge?.NotifyPpuAddress(address, ppuCycle);
 }
