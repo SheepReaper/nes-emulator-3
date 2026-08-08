@@ -49,6 +49,7 @@ public sealed class Ppu(
     private int _cycle;
     private bool _oddFrame;
     private bool _suppressVblank;
+    private int _vblankNmiDelayDots;
     private bool _hasPublishedFrame;
 
     internal event Action<ulong>? FrameCompleted;
@@ -90,6 +91,7 @@ public sealed class Ppu(
         _cycle = 0;
         _oddFrame = false;
         _suppressVblank = false;
+        _vblankNmiDelayDots = 0;
         FrameNumber = 0;
         _hasPublishedFrame = false;
         interrupts.Nmi = false;
@@ -120,13 +122,18 @@ public sealed class Ppu(
                 _tempVramAddress = (ushort)((_tempVramAddress & 0xF3FF) | ((value & 0x03) << 10));
                 if (!wasNmiEnabled && _ppuCtrl.VBlankNmiEnable && _ppuStatus.VBlank)
                 {
+                    _vblankNmiDelayDots = 0;
                     interrupts.Nmi = true;
                     // CPU writes are applied at the beginning of the instruction in this functional core.
                     // A physical STA changes PPUCTRL on its final cycle, after the interrupt poll, so the
                     // instruction following the STA completes before this immediate NMI is recognized.
                     interrupts.DelayNmiOneInstruction = true;
                 }
-                if (!_ppuCtrl.VBlankNmiEnable) interrupts.Nmi = false;
+                if (!_ppuCtrl.VBlankNmiEnable)
+                {
+                    _vblankNmiDelayDots = 0;
+                    interrupts.Nmi = false;
+                }
                 break;
             case 0x2001:
                 _ppuMask.Value = value;
@@ -162,12 +169,17 @@ public sealed class Ppu(
         var preRenderScanline = _timing.ScanlinesPerFrame - 1;
         var renderingEnabled = IsRenderingEnabled;
 
+        if (_vblankNmiDelayDots > 0 && --_vblankNmiDelayDots == 0 &&
+            _ppuStatus.VBlank && _ppuCtrl.VBlankNmiEnable)
+            interrupts.Nmi = true;
+
         if (_scanline == preRenderScanline && _cycle == 1)
         {
             _ppuStatus.VBlank = false;
             _ppuStatus.Sprite0Hit = false;
             _ppuStatus.SpriteOverflow = false;
             interrupts.Nmi = false;
+            _vblankNmiDelayDots = 0;
             _suppressVblank = false;
         }
 
@@ -176,7 +188,7 @@ public sealed class Ppu(
             if (!_suppressVblank)
             {
                 _ppuStatus.VBlank = true;
-                if (_ppuCtrl.VBlankNmiEnable) interrupts.Nmi = true;
+                if (_ppuCtrl.VBlankNmiEnable) _vblankNmiDelayDots = 2;
             }
             _suppressVblank = false;
         }
@@ -189,7 +201,9 @@ public sealed class Ppu(
 
         if (_scanline < FrameHeight && _cycle is >= 1 and <= 256) RenderPixel(_cycle - 1, _scanline);
 
-        var completedFrame = _scanline == 239 && _cycle == _timing.DotsPerScanline - 1 ? PublishFrame() : (ulong?)null;
+        var completedFrame = _scanline == 239 && _cycle == _timing.DotsPerScanline - 1
+            ? PublishFrame()
+            : (ulong?)null;
         AdvanceTiming(preRenderScanline, renderingEnabled);
         if (completedFrame.HasValue) FrameCompleted?.Invoke(completedFrame.Value);
     }
@@ -508,8 +522,9 @@ public sealed class Ppu(
     {
         // VBlank race behavior: https://www.nesdev.org/wiki/PPU_frame_timing#VBL_Flag_Timing
         var value = (byte)((_ppuStatus.Value & 0xE0) | (_ioLatch & 0x1F));
-        if (_scanline == 241 && _cycle <= 1) _suppressVblank = true;
+        if (_scanline == 241 && _cycle == 1) _suppressVblank = true;
         _ppuStatus.VBlank = false;
+        _vblankNmiDelayDots = 0;
         interrupts.Nmi = false;
         interrupts.DelayNmiOneInstruction = false;
         _writeToggle = false;

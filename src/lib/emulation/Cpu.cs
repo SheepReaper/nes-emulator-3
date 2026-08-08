@@ -28,6 +28,7 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     private bool _nmiPending;
     private bool _delayPendingNmiOneInstruction;
     private bool _deferIrqOneInstruction;
+    private Action? _endOfInstructionAction;
 
     public void ConnectBus(IBus bus)
     {
@@ -53,6 +54,7 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
         _nmiPending = false;
         _delayPendingNmiOneInstruction = false;
         _deferIrqOneInstruction = false;
+        _endOfInstructionAction = null;
 
         // The 2A03 reset sequence takes 7 cycles before opcode execution begins.
         _cycles = 7;
@@ -407,6 +409,13 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
                 $"Opcode ${_opcode:X2} executed in fewer cycles than its descriptor.");
         }
 
+        if (_cycles == 1 && _endOfInstructionAction != null)
+        {
+            var action = _endOfInstructionAction;
+            _endOfInstructionAction = null;
+            action();
+        }
+
         // The CPU always consumes one cycle per clock tick.
         // If a new instruction was fetched, _cycles now holds the remaining duration.
         _cycles--;
@@ -467,6 +476,10 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
         Debug.Assert(_bus != null, "CPU bus is not connected.");
         _bus.Write(address, value);
     }
+
+    private static bool IsIoAddress(ushort address) => address is >= 0x2000 and <= 0x401F;
+
+    private void CompleteIoAccess(Action action) => _endOfInstructionAction = action;
 
     // Helper method to read a 16-bit word from the bus (little-endian)
     private ushort ReadWord(ushort address)
@@ -651,7 +664,13 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     private void LDA_IMM() { _a = Read(Addr_IMM()); SetZeroAndNegativeFlags(_a); _cycles = 2; }
     private void LDA_ZP() { _a = Read(Addr_ZP()); SetZeroAndNegativeFlags(_a); _cycles = 3; }
     private void LDA_ZPX() { _a = Read(Addr_ZPX()); SetZeroAndNegativeFlags(_a); _cycles = 4; }
-    private void LDA_ABS() { _a = Read(Addr_ABS()); SetZeroAndNegativeFlags(_a); _cycles = 4; }
+    private void LDA_ABS()
+    {
+        var address = Addr_ABS();
+        _cycles = 4;
+        void Load() { _a = Read(address); SetZeroAndNegativeFlags(_a); }
+        if (IsIoAddress(address)) CompleteIoAccess(Load); else Load();
+    }
     private void LDA_ABSX() { _cycles = 4; _a = Read(Addr_ABSX()); SetZeroAndNegativeFlags(_a); }
     private void LDA_ABSY() { _cycles = 4; _a = Read(Addr_ABSY()); SetZeroAndNegativeFlags(_a); }
     private void LDA_INDX() { _a = Read(Addr_INDX()); SetZeroAndNegativeFlags(_a); _cycles = 6; }
@@ -661,14 +680,26 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     private void LDX_IMM() { _x = Read(Addr_IMM()); SetZeroAndNegativeFlags(_x); _cycles = 2; }
     private void LDX_ZP() { _x = Read(Addr_ZP()); SetZeroAndNegativeFlags(_x); _cycles = 3; }
     private void LDX_ZPY() { _x = Read(Addr_ZPY()); SetZeroAndNegativeFlags(_x); _cycles = 4; }
-    private void LDX_ABS() { _x = Read(Addr_ABS()); SetZeroAndNegativeFlags(_x); _cycles = 4; }
+    private void LDX_ABS()
+    {
+        var address = Addr_ABS();
+        _cycles = 4;
+        void Load() { _x = Read(address); SetZeroAndNegativeFlags(_x); }
+        if (IsIoAddress(address)) CompleteIoAccess(Load); else Load();
+    }
     private void LDX_ABSY() { _cycles = 4; _x = Read(Addr_ABSY()); SetZeroAndNegativeFlags(_x); }
 
     // LDY (Load Y Register)
     private void LDY_IMM() { _y = Read(Addr_IMM()); SetZeroAndNegativeFlags(_y); _cycles = 2; }
     private void LDY_ZP() { _y = Read(Addr_ZP()); SetZeroAndNegativeFlags(_y); _cycles = 3; }
     private void LDY_ZPX() { _y = Read(Addr_ZPX()); SetZeroAndNegativeFlags(_y); _cycles = 4; }
-    private void LDY_ABS() { _y = Read(Addr_ABS()); SetZeroAndNegativeFlags(_y); _cycles = 4; }
+    private void LDY_ABS()
+    {
+        var address = Addr_ABS();
+        _cycles = 4;
+        void Load() { _y = Read(address); SetZeroAndNegativeFlags(_y); }
+        if (IsIoAddress(address)) CompleteIoAccess(Load); else Load();
+    }
     private void LDY_ABSX() { _cycles = 4; _y = Read(Addr_ABSX()); SetZeroAndNegativeFlags(_y); }
 
     // AND (Logical AND)
@@ -938,7 +969,13 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     // STA (Store Accumulator)
     private void STA_ZP() { Write(Addr_ZP(), _a); _cycles = 3; }
     private void STA_ZPX() { Write(Addr_ZPX(), _a); _cycles = 4; }
-    private void STA_ABS() { Write(Addr_ABS(), _a); _cycles = 4; }
+    private void STA_ABS()
+    {
+        var address = Addr_ABS();
+        _cycles = 4;
+        if (IsIoAddress(address)) CompleteIoAccess(() => Write(address, _a));
+        else Write(address, _a);
+    }
     private void STA_ABSX() { Write(Addr_ABSX_Write(), _a); _cycles = 5; }
     private void STA_ABSY() { Write(Addr_ABSY_Write(), _a); _cycles = 5; }
     private void STA_INDX() { Write(Addr_INDX(), _a); _cycles = 6; }
@@ -947,12 +984,24 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     // STX (Store Index X)
     private void STX_ZP() { Write(Addr_ZP(), _x); _cycles = 3; }
     private void STX_ZPY() { Write(Addr_ZPY(), _x); _cycles = 4; }
-    private void STX_ABS() { Write(Addr_ABS(), _x); _cycles = 4; }
+    private void STX_ABS()
+    {
+        var address = Addr_ABS();
+        _cycles = 4;
+        if (IsIoAddress(address)) CompleteIoAccess(() => Write(address, _x));
+        else Write(address, _x);
+    }
 
     // STY (Store Index Y)
     private void STY_ZP() { Write(Addr_ZP(), _y); _cycles = 3; }
     private void STY_ZPX() { Write(Addr_ZPX(), _y); _cycles = 4; }
-    private void STY_ABS() { Write(Addr_ABS(), _y); _cycles = 4; }
+    private void STY_ABS()
+    {
+        var address = Addr_ABS();
+        _cycles = 4;
+        if (IsIoAddress(address)) CompleteIoAccess(() => Write(address, _y));
+        else Write(address, _y);
+    }
 
     // INC (Increment Memory)
     private void INC_ZP() { ushort addr = Addr_ZP(); byte val = (byte)(Read(addr) + 1); Write(addr, val); SetZeroAndNegativeFlags(val); _cycles = 5; }
@@ -1004,7 +1053,13 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     // BIT (Test Bits)
     private void BIT(ushort addr) { byte operand = Read(addr); _p.Zero = (_a & operand) == 0; _p.Overflow = (operand & 0x40) != 0; _p.Negative = (operand & 0x80) != 0; }
     private void BIT_ZP() { BIT(Addr_ZP()); _cycles = 3; }
-    private void BIT_ABS() { BIT(Addr_ABS()); _cycles = 4; }
+    private void BIT_ABS()
+    {
+        var address = Addr_ABS();
+        _cycles = 4;
+        if (IsIoAddress(address)) CompleteIoAccess(() => BIT(address));
+        else BIT(address);
+    }
 
     // ASL (Arithmetic Shift Left)
     private byte ASL(byte operand) { _p.Carry = (operand & 0x80) != 0; byte result = (byte)(operand << 1); SetZeroAndNegativeFlags(result); return result; }

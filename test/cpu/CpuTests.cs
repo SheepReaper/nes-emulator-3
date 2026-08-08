@@ -1298,6 +1298,37 @@ public class CpuTests
         Assert.Equal(0x9000, GetPc());
     }
 
+    [Fact]
+    public void AbsoluteIoWriteOccursOnTheInstructionsFinalCycle()
+    {
+        _bus.Load(0x8000, [0x8D, 0x00, 0x20]);
+        SetPc(0x8000);
+        SetA(0x42);
+        SetCycles(0);
+
+        Clock(3);
+        Assert.Equal(0, _bus.Read(0x2000));
+
+        _cpu.Clock();
+        Assert.Equal(0x42, _bus.Read(0x2000));
+    }
+
+    [Fact]
+    public void AbsoluteIoReadSamplesTheBusOnTheInstructionsFinalCycle()
+    {
+        _bus.Load(0x8000, [0xAD, 0x02, 0x20]);
+        _bus.Write(0x2002, 0x11);
+        SetPc(0x8000);
+        SetCycles(0);
+
+        _cpu.Clock();
+        _bus.Write(0x2002, 0x22);
+        Clock(3);
+
+        Assert.Equal(0x22, GetA());
+    }
+
+
     [Theory]
     [InlineData(false, 0x9000, true)]  // IRQ when I flag is clear: should trigger
     [InlineData(true, 0x8001, true)]   // IRQ when I flag is set: should be ignored
