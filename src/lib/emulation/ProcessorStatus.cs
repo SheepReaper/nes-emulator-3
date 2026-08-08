@@ -1,25 +1,29 @@
-using System.Runtime.InteropServices;
-
 namespace SR.Emulation.Nes;
 
-[StructLayout(LayoutKind.Explicit)]
 public record struct ProcessorStatus
 {
-    [FieldOffset(0)]
     public byte Value;
 
-    [FieldOffset(0)]
-    public bool Carry; // C
-    [FieldOffset(1)]
-    public bool Zero; // Z
-    [FieldOffset(2)]
-    public bool InterruptDisable; // I
-    [FieldOffset(3)]
-    public bool Decimal; // D
-    [FieldOffset(4)]
-    public bool Break; // B
-    [FieldOffset(6)]
-    public bool Overflow; // V
-    [FieldOffset(7)]
-    public bool Negative; // N
+    private const byte C_MASK = 1 << 0;
+    private const byte Z_MASK = 1 << 1;
+    private const byte I_MASK = 1 << 2;
+    private const byte D_MASK = 1 << 3;
+    private const byte B_MASK = 1 << 4;
+    private const byte U_MASK = 1 << 5; // Unused
+    private const byte V_MASK = 1 << 6;
+    private const byte N_MASK = 1 << 7;
+
+    public bool Carry { get => (Value & C_MASK) != 0; set => Value = (byte)(value ? Value | C_MASK : Value & ~C_MASK); }
+    public bool Zero { get => (Value & Z_MASK) != 0; set => Value = (byte)(value ? Value | Z_MASK : Value & ~Z_MASK); }
+    public bool InterruptDisable { get => (Value & I_MASK) != 0; set => Value = (byte)(value ? Value | I_MASK : Value & ~I_MASK); }
+    public bool Decimal { get => (Value & D_MASK) != 0; set => Value = (byte)(value ? Value | D_MASK : Value & ~D_MASK); }
+    public bool Break { get => (Value & B_MASK) != 0; set => Value = (byte)(value ? Value | B_MASK : Value & ~B_MASK); }
+    public bool Overflow { get => (Value & V_MASK) != 0; set => Value = (byte)(value ? Value | V_MASK : Value & ~V_MASK); }
+    public bool Negative { get => (Value & N_MASK) != 0; set => Value = (byte)(value ? Value | N_MASK : Value & ~N_MASK); }
+
+    public ProcessorStatus()
+    {
+        // Ensure unused bit 5 is always set
+        Value = U_MASK;
+    }
 }

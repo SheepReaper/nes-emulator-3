@@ -7,6 +7,7 @@ namespace SR.Emulation.Nes;
 
 public sealed class Cpu(InterruptLines interrupts) : IBusMaster
 {
+    private readonly InterruptLines _interrupts = interrupts; // Store the InterruptLines instance
     private IBus? _bus;
 
     // Registers
@@ -46,7 +47,7 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
         _p.Value = 0b0010_0100;
 
         // Reset takes 8 cycles
-        _cycles = 8;
+        _cycles = 7; // 8 total cycles, 1 consumed on this tick
     }
 
     public void Clock(ulong masterClock)
@@ -55,140 +56,139 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
 
         _masterClock = masterClock;
 
-        if (_cycles == 0) // Instruction has just completed, or CPU was idle. Time to fetch new instruction.
+        if (_cycles == 0)
         {
-            // Check for interrupts before fetching the next instruction
-            if (interrupts.Nmi)
-            {
-                HandleNmi();
-                interrupts.Nmi = false;
-                // NMI sets _cycles to 7. We consume 1 cycle here.
-                _cycles--; // Consume the first cycle of the interrupt sequence
-                return;
-            }
-            else if (interrupts.Irq && !_p.InterruptDisable)
-            {
-                HandleIrq();
-                // The IRQ line is not cleared by the CPU, but by the device that asserted it.
-                // IRQ sets _cycles to 7. We consume 1 cycle here.
-                _cycles--; // Consume the first cycle of the interrupt sequence
-                return;
-            }
 
-            // Fetch opcode
-            _opcode = Read(_pc++);
-
-            // Execute instruction and set cycles
-            Action instruction = _opcode switch
-            {
-                0xEA => NOP, // NOP - Implied
-
-                // LDA (Load Accumulator) instructions
-                0xA9 => LDA_IMM, // LDA - Immediate
-                0xA5 => LDA_ZP,  // LDA - Zero Page
-                0xB5 => LDA_ZPX, // LDA - Zero Page, X
-                0xAD => LDA_ABS, // LDA - Absolute
-                0xBD => LDA_ABSX, // LDA - Absolute, X
-                0xB9 => LDA_ABSY, // LDA - Absolute, Y
-                0xA1 => LDA_INDX, // LDA - Indirect, X
-                0xB1 => LDA_INDY, // LDA - Indirect, Y
-
-                // Logical instructions
-                0x29 => AND_IMM, 0x25 => AND_ZP, 0x35 => AND_ZPX, 0x2D => AND_ABS, 0x3D => AND_ABSX, 0x39 => AND_ABSY, 0x21 => AND_INDX, 0x31 => AND_INDY, // AND
-                0x49 => EOR_IMM, 0x45 => EOR_ZP, 0x55 => EOR_ZPX, 0x4D => EOR_ABS, 0x5D => EOR_ABSX, 0x59 => EOR_ABSY, 0x41 => EOR_INDX, 0x51 => EOR_INDY, // EOR
-                0x09 => ORA_IMM, 0x05 => ORA_ZP, 0x15 => ORA_ZPX, 0x0D => ORA_ABS, 0x1D => ORA_ABSX, 0x19 => ORA_ABSY, 0x01 => ORA_INDX, 0x11 => ORA_INDY, // ORA
-
-                // Arithmetic instructions
-                0x69 => ADC_IMM, 0x65 => ADC_ZP, 0x75 => ADC_ZPX, 0x6D => ADC_ABS, 0x7D => ADC_ABSX, 0x79 => ADC_ABSY, 0x61 => ADC_INDX, 0x71 => ADC_INDY, // ADC
-                0xE9 => SBC_IMM, 0xE5 => SBC_ZP, 0xF5 => SBC_ZPX, 0xED => SBC_ABS, 0xFD => SBC_ABSX, 0xF9 => SBC_ABSY, 0xE1 => SBC_INDX, 0xF1 => SBC_INDY, // SBC
-
-                // STA (Store Accumulator) instructions
-                0x85 => STA_ZP,   // STA - Zero Page
-                0x95 => STA_ZPX,  // STA - Zero Page, X
-                0x8D => STA_ABS,  // STA - Absolute
-                0x9D => STA_ABSX, // STA - Absolute, X
-                0x99 => STA_ABSY, // STA - Absolute, Y
-                0x81 => STA_INDX, // STA - (Indirect, X)
-                0x91 => STA_INDY, // STA - (Indirect), Y
-
-                // STX / STY (Store Index) instructions
-                0x86 => STX_ZP, 0x96 => STX_ZPY, 0x8E => STX_ABS, // STX
-                0x84 => STY_ZP, 0x94 => STY_ZPX, 0x8C => STY_ABS, // STY
-
-                // Increment/Decrement instructions
-                0xE6 => INC_ZP, 0xF6 => INC_ZPX, 0xEE => INC_ABS, 0xFE => INC_ABSX, // INC
-                0xC6 => DEC_ZP, 0xD6 => DEC_ZPX, 0xCE => DEC_ABS, 0xDE => DEC_ABSX, // DEC
-                0xE8 => INX_IMP, 0xC8 => INY_IMP, // INX, INY
-                0xCA => DEX_IMP, 0x88 => DEY_IMP, // DEX, DEY
-
-                // Shift and Rotate instructions
-                0x0A => ASL_ACC, 0x06 => ASL_ZP, 0x16 => ASL_ZPX, 0x0E => ASL_ABS, 0x1E => ASL_ABSX, // ASL
-                0x4A => LSR_ACC, 0x46 => LSR_ZP, 0x56 => LSR_ZPX, 0x4E => LSR_ABS, 0x5E => LSR_ABSX, // LSR
-                0x2A => ROL_ACC, 0x26 => ROL_ZP, 0x36 => ROL_ZPX, 0x2E => ROL_ABS, 0x3E => ROL_ABSX, // ROL
-                0x6A => ROR_ACC, 0x66 => ROR_ZP, 0x76 => ROR_ZPX, 0x6E => ROR_ABS, 0x7E => ROR_ABSX, // ROR
-
-                // Compare and Bit Test instructions
-                0xC9 => CMP_IMM, 0xC5 => CMP_ZP, 0xD5 => CMP_ZPX, 0xCD => CMP_ABS, 0xDD => CMP_ABSX, 0xD9 => CMP_ABSY, 0xC1 => CMP_INDX, 0xD1 => CMP_INDY, // CMP
-                0xE0 => CPX_IMM, 0xE4 => CPX_ZP, 0xEC => CPX_ABS, // CPX
-                0xC0 => CPY_IMM, 0xC4 => CPY_ZP, 0xCC => CPY_ABS, // CPY
-                0x24 => BIT_ZP, 0x2C => BIT_ABS, // BIT
-
-                // Register Transfer instructions
-                0xAA => TAX_IMP, // TAX
-                0xA8 => TAY_IMP, // TAY
-                0x8A => TXA_IMP, // TXA
-                0x98 => TYA_IMP, // TYA
-                0xBA => TSX_IMP, // TSX
-                0x9A => TXS_IMP, // TXS
-
-                // Flag Control instructions
-                0x18 => CLC_IMP, 0x38 => SEC_IMP, // Carry
-                0x58 => CLI_IMP, 0x78 => SEI_IMP, // Interrupt
-                0xB8 => CLV_IMP,                  // Overflow
-                0xD8 => CLD_IMP, 0xF8 => SED_IMP, // Decimal
-
-                // System instructions
-                0x00 => BRK_IMP, 0x40 => RTI_IMP,
-
-                // Stack and Subroutine instructions
-                0x20 => JSR_ABS, // JSR - Absolute
-                0x60 => RTS_IMP, // RTS - Implied
-
-                // Stack instructions
-                0x48 => PHA_IMP, // PHA - Push Accumulator
-                0x68 => PLA_IMP, // PLA - Pull Accumulator
-                0x08 => PHP_IMP, // PHP - Push Processor Status
-                0x28 => PLP_IMP, // PLP - Pull Processor Status
-                // Branch instructions
-                0x10 => () => Branch(!_p.Negative), // BPL (Branch on Plus)
-                0x30 => () => Branch(_p.Negative),  // BMI (Branch on Minus)
-                0x50 => () => Branch(!_p.Overflow), // BVC (Branch on Overflow Clear)
-                0x70 => () => Branch(_p.Overflow),  // BVS (Branch on Overflow Set)
-                0x90 => () => Branch(!_p.Carry),    // BCC (Branch on Carry Clear)
-                0xB0 => () => Branch(_p.Carry),     // BCS (Branch on Carry Set)
-                0xD0 => () => Branch(!_p.Zero),     // BNE (Branch on Not Equal)
-                0xF0 => () => Branch(_p.Zero),      // BEQ (Branch on Equal)
-
-                _ => () => _cycles = 1 // For now, unsupported opcodes will do nothing for 1 cycle
-            };
-
-            instruction();
-            _cycles--; // Consume the first cycle of this new instruction.
-        }
-        else
+        // Check for interrupts before fetching the next instruction
+        if (_interrupts.Nmi)
         {
-            // We are in the middle of a multi-cycle instruction. Just consume a cycle.
-            _cycles--;
+            HandleNmi();
+            _interrupts.Nmi = false;
+            return;
         }
+        
+        if (_interrupts.Irq && !_p.InterruptDisable)
+        {
+            HandleIrq();
+            // The IRQ line is not cleared by the CPU, but by the device that asserted it.
+            return;
+        }
+
+        // Fetch opcode
+        _opcode = Read(_pc++);
+
+        // Execute instruction and set cycles
+        Action instruction = _opcode switch
+        {
+            0xEA => NOP, // NOP - Implied
+
+            // LDA (Load Accumulator) instructions
+            0xA9 => LDA_IMM, // LDA - Immediate
+            0xA5 => LDA_ZP,  // LDA - Zero Page
+            0xB5 => LDA_ZPX, // LDA - Zero Page, X
+            0xAD => LDA_ABS, // LDA - Absolute
+            0xBD => LDA_ABSX, // LDA - Absolute, X
+            0xB9 => LDA_ABSY, // LDA - Absolute, Y
+            0xA1 => LDA_INDX, // LDA - Indirect, X
+            0xB1 => LDA_INDY, // LDA - Indirect, Y
+
+            // Logical instructions
+            0x29 => AND_IMM, 0x25 => AND_ZP, 0x35 => AND_ZPX, 0x2D => AND_ABS, 0x3D => AND_ABSX, 0x39 => AND_ABSY, 0x21 => AND_INDX, 0x31 => AND_INDY, // AND
+            0x49 => EOR_IMM, 0x45 => EOR_ZP, 0x55 => EOR_ZPX, 0x4D => EOR_ABS, 0x5D => EOR_ABSX, 0x59 => EOR_ABSY, 0x41 => EOR_INDX, 0x51 => EOR_INDY, // EOR
+            0x09 => ORA_IMM, 0x05 => ORA_ZP, 0x15 => ORA_ZPX, 0x0D => ORA_ABS, 0x1D => ORA_ABSX, 0x19 => ORA_ABSY, 0x01 => ORA_INDX, 0x11 => ORA_INDY, // ORA
+
+            // Arithmetic instructions
+            0x69 => ADC_IMM, 0x65 => ADC_ZP, 0x75 => ADC_ZPX, 0x6D => ADC_ABS, 0x7D => ADC_ABSX, 0x79 => ADC_ABSY, 0x61 => ADC_INDX, 0x71 => ADC_INDY, // ADC
+            0xE9 => SBC_IMM, 0xE5 => SBC_ZP, 0xF5 => SBC_ZPX, 0xED => SBC_ABS, 0xFD => SBC_ABSX, 0xF9 => SBC_ABSY, 0xE1 => SBC_INDX, 0xF1 => SBC_INDY, // SBC
+
+            // STA (Store Accumulator) instructions
+            0x85 => STA_ZP,   // STA - Zero Page
+            0x95 => STA_ZPX,  // STA - Zero Page, X
+            0x8D => STA_ABS,  // STA - Absolute
+            0x9D => STA_ABSX, // STA - Absolute, X
+            0x99 => STA_ABSY, // STA - Absolute, Y
+            0x81 => STA_INDX, // STA - (Indirect, X)
+            0x91 => STA_INDY, // STA - (Indirect), Y
+
+            // STX / STY (Store Index) instructions
+            0x86 => STX_ZP, 0x96 => STX_ZPY, 0x8E => STX_ABS, // STX
+            0x84 => STY_ZP, 0x94 => STY_ZPX, 0x8C => STY_ABS, // STY
+
+            // Increment/Decrement instructions
+            0xE6 => INC_ZP, 0xF6 => INC_ZPX, 0xEE => INC_ABS, 0xFE => INC_ABSX, // INC
+            0xC6 => DEC_ZP, 0xD6 => DEC_ZPX, 0xCE => DEC_ABS, 0xDE => DEC_ABSX, // DEC
+            0xE8 => INX_IMP, 0xC8 => INY_IMP, // INX, INY
+            0xCA => DEX_IMP, 0x88 => DEY_IMP, // DEX, DEY
+
+            // Shift and Rotate instructions
+            0x0A => ASL_ACC, 0x06 => ASL_ZP, 0x16 => ASL_ZPX, 0x0E => ASL_ABS, 0x1E => ASL_ABSX, // ASL
+            0x4A => LSR_ACC, 0x46 => LSR_ZP, 0x56 => LSR_ZPX, 0x4E => LSR_ABS, 0x5E => LSR_ABSX, // LSR
+            0x2A => ROL_ACC, 0x26 => ROL_ZP, 0x36 => ROL_ZPX, 0x2E => ROL_ABS, 0x3E => ROL_ABSX, // ROL
+            0x6A => ROR_ACC, 0x66 => ROR_ZP, 0x76 => ROR_ZPX, 0x6E => ROR_ABS, 0x7E => ROR_ABSX, // ROR
+
+            // Compare and Bit Test instructions
+            0xC9 => CMP_IMM, 0xC5 => CMP_ZP, 0xD5 => CMP_ZPX, 0xCD => CMP_ABS, 0xDD => CMP_ABSX, 0xD9 => CMP_ABSY, 0xC1 => CMP_INDX, 0xD1 => CMP_INDY, // CMP
+            0xE0 => CPX_IMM, 0xE4 => CPX_ZP, 0xEC => CPX_ABS, // CPX
+            0xC0 => CPY_IMM, 0xC4 => CPY_ZP, 0xCC => CPY_ABS, // CPY
+            0x24 => BIT_ZP, 0x2C => BIT_ABS, // BIT
+
+            // Register Transfer instructions
+            0xAA => TAX_IMP, // TAX
+            0xA8 => TAY_IMP, // TAY
+            0x8A => TXA_IMP, // TXA
+            0x98 => TYA_IMP, // TYA
+            0xBA => TSX_IMP, // TSX
+            0x9A => TXS_IMP, // TXS
+
+            // Flag Control instructions
+            0x18 => CLC_IMP, 0x38 => SEC_IMP, // Carry
+            0x58 => CLI_IMP, 0x78 => SEI_IMP, // Interrupt
+            0xB8 => CLV_IMP,                  // Overflow
+            0xD8 => CLD_IMP, 0xF8 => SED_IMP, // Decimal
+
+            // System instructions
+            0x00 => BRK_IMP, 0x40 => RTI_IMP,
+
+            // Stack and Subroutine instructions
+            0x20 => JSR_ABS, // JSR - Absolute
+            0x60 => RTS_IMP, // RTS - Implied
+
+            // Stack instructions
+            0x48 => PHA_IMP, // PHA - Push Accumulator
+            0x68 => PLA_IMP, // PLA - Pull Accumulator
+            0x08 => PHP_IMP, // PHP - Push Processor Status
+            0x28 => PLP_IMP, // PLP - Pull Processor Status
+            // Branch instructions
+            0x10 => () => Branch(!_p.Negative), // BPL (Branch on Plus)
+            0x30 => () => Branch(_p.Negative),  // BMI (Branch on Minus)
+            0x50 => () => Branch(!_p.Overflow), // BVC (Branch on Overflow Clear)
+            0x70 => () => Branch(_p.Overflow),  // BVS (Branch on Overflow Set)
+            0x90 => () => Branch(!_p.Carry),    // BCC (Branch on Carry Clear)
+            0xB0 => () => Branch(_p.Carry),     // BCS (Branch on Carry Set)
+            0xD0 => () => Branch(!_p.Zero),     // BNE (Branch on Not Equal)
+            0xF0 => () => Branch(_p.Zero),      // BEQ (Branch on Equal)
+
+            _ => () => _cycles = 1 // For now, unsupported opcodes will do nothing for 1 cycle
+        };
+
+        instruction();
+        }
+
+        // The CPU always consumes one cycle per clock tick.
+        // If a new instruction was fetched, _cycles now holds the remaining duration.
+        _cycles--;
     }
+
+
 
     private void HandleNmi()
     {
         // Push PC and status register to stack
+        // For NMI/IRQ, B flag is clear and U is set. PC is pushed *before* incrementing.
         Push((byte)(_pc >> 8));
         Push((byte)(_pc & 0xFF));
-        Push((byte)(_p.Value & ~0b00010000)); // Clear B flag
-
+        Push((byte)((_p.Value | 0b00100000) & ~0b00010000));
+        
         // Set interrupt disable flag
         _p.InterruptDisable = true;
 
@@ -200,10 +200,11 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     private void HandleIrq()
     {
         // Push PC and status register to stack
+        // For NMI/IRQ, B flag is clear and U is set. PC is pushed *before* incrementing.
         Push((byte)(_pc >> 8));
         Push((byte)(_pc & 0xFF));
-        Push((byte)(_p.Value & ~0b00010000)); // Clear B flag
-
+        Push((byte)((_p.Value | 0b00100000) & ~0b00010000));
+        
         _p.InterruptDisable = true;
         _pc = ReadWord(0xFFFE); // Load PC from IRQ/BRK vector
         _cycles = 7;
@@ -263,25 +264,22 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     {
         if (condition)
         {
-            // Capture the PC before adding the offset to check for page crossing later.
-            ushort oldPc = _pc;
             sbyte offset = (sbyte)Read(_pc++);
+            ushort oldPc = _pc;
             ushort targetAddress = (ushort)(_pc + offset);
 
-            // Branch is taken. Base time is 3 cycles.
-            _cycles = 3;
+            // A taken branch costs 1 extra cycle.
+            _cycles = 1;
 
             // If the branch crosses a page boundary, add another cycle.
             if ((oldPc & 0xFF00) != (targetAddress & 0xFF00)) _cycles++;
+
             _pc = targetAddress;
         }
         else
         {
-            // If branch is not taken, we still need to read the offset to advance the PC.
+            // We must still read the operand to advance the PC past it.
             _pc++;
-
-            // Branch not taken. Total time is 2 cycles.
-            _cycles = 2;
         }
     }
 
@@ -397,109 +395,102 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     }
 
     // LDA (Load Accumulator)
-    private void LDA_IMM() { _a = Read(Addr_IMM()); SetZeroAndNegativeFlags(_a); _cycles = 2; }
-    private void LDA_ZP() { _a = Read(Addr_ZP()); SetZeroAndNegativeFlags(_a); _cycles = 3; }
-    private void LDA_ZPX() { _a = Read(Addr_ZPX()); SetZeroAndNegativeFlags(_a); _cycles = 4; }
-    private void LDA_ABS() { _a = Read(Addr_ABS()); SetZeroAndNegativeFlags(_a); _cycles = 4; }
+    private void LDA_IMM() { _a = Read(Addr_IMM()); SetZeroAndNegativeFlags(_a); _cycles = 1; } // 2 total cycles
+    private void LDA_ZP() { _a = Read(Addr_ZP()); SetZeroAndNegativeFlags(_a); _cycles = 2; } // 3 total cycles
+    private void LDA_ZPX() { _a = Read(Addr_ZPX()); SetZeroAndNegativeFlags(_a); _cycles = 3; } // 4 total cycles
+    private void LDA_ABS() { _a = Read(Addr_ABS()); SetZeroAndNegativeFlags(_a); _cycles = 3; } // 4 total cycles
     private void LDA_ABSX() { byte baseCycles = 4; _a = Read(Addr_ABSX(ref baseCycles)); SetZeroAndNegativeFlags(_a); _cycles = baseCycles; }
     private void LDA_ABSY() { byte baseCycles = 4; _a = Read(Addr_ABSY(ref baseCycles)); SetZeroAndNegativeFlags(_a); _cycles = baseCycles; }
     private void LDA_INDX() { _a = Read(Addr_INDX()); SetZeroAndNegativeFlags(_a); _cycles = 6; }
     private void LDA_INDY() { byte baseCycles = 5; _a = Read(Addr_INDY(ref baseCycles)); SetZeroAndNegativeFlags(_a); _cycles = baseCycles; }
 
     // AND (Logical AND)
-    private void AND_IMM() { _a &= Read(Addr_IMM()); SetZeroAndNegativeFlags(_a); _cycles = 2; }
-    private void AND_ZP() { _a &= Read(Addr_ZP()); SetZeroAndNegativeFlags(_a); _cycles = 3; }
-    private void AND_ZPX() { _a &= Read(Addr_ZPX()); SetZeroAndNegativeFlags(_a); _cycles = 4; }
-    private void AND_ABS() { _a &= Read(Addr_ABS()); SetZeroAndNegativeFlags(_a); _cycles = 4; }
+    private void AND_IMM() { _a &= Read(Addr_IMM()); SetZeroAndNegativeFlags(_a); _cycles = 1; } // 2 total cycles
+    private void AND_ZP() { _a &= Read(Addr_ZP()); SetZeroAndNegativeFlags(_a); _cycles = 2; } // 3 total cycles
+    private void AND_ZPX() { _a &= Read(Addr_ZPX()); SetZeroAndNegativeFlags(_a); _cycles = 3; } // 4 total cycles
+    private void AND_ABS() { _a &= Read(Addr_ABS()); SetZeroAndNegativeFlags(_a); _cycles = 3; } // 4 total cycles
     private void AND_ABSX() { byte baseCycles = 4; _a &= Read(Addr_ABSX(ref baseCycles)); SetZeroAndNegativeFlags(_a); _cycles = baseCycles; }
     private void AND_ABSY() { byte baseCycles = 4; _a &= Read(Addr_ABSY(ref baseCycles)); SetZeroAndNegativeFlags(_a); _cycles = baseCycles; }
     private void AND_INDX() { _a &= Read(Addr_INDX()); SetZeroAndNegativeFlags(_a); _cycles = 6; }
     private void AND_INDY() { byte baseCycles = 5; _a &= Read(Addr_INDY(ref baseCycles)); SetZeroAndNegativeFlags(_a); _cycles = baseCycles; }
 
     // EOR (Logical Exclusive OR)
-    private void EOR_IMM() { _a ^= Read(Addr_IMM()); SetZeroAndNegativeFlags(_a); _cycles = 2; }
-    private void EOR_ZP() { _a ^= Read(Addr_ZP()); SetZeroAndNegativeFlags(_a); _cycles = 3; }
-    private void EOR_ZPX() { _a ^= Read(Addr_ZPX()); SetZeroAndNegativeFlags(_a); _cycles = 4; }
-    private void EOR_ABS() { _a ^= Read(Addr_ABS()); SetZeroAndNegativeFlags(_a); _cycles = 4; }
+    private void EOR_IMM() { _a ^= Read(Addr_IMM()); SetZeroAndNegativeFlags(_a); _cycles = 1; } // 2 total cycles
+    private void EOR_ZP() { _a ^= Read(Addr_ZP()); SetZeroAndNegativeFlags(_a); _cycles = 2; } // 3 total cycles
+    private void EOR_ZPX() { _a ^= Read(Addr_ZPX()); SetZeroAndNegativeFlags(_a); _cycles = 3; } // 4 total cycles
+    private void EOR_ABS() { _a ^= Read(Addr_ABS()); SetZeroAndNegativeFlags(_a); _cycles = 3; } // 4 total cycles
     private void EOR_ABSX() { byte baseCycles = 4; _a ^= Read(Addr_ABSX(ref baseCycles)); SetZeroAndNegativeFlags(_a); _cycles = baseCycles; }
     private void EOR_ABSY() { byte baseCycles = 4; _a ^= Read(Addr_ABSY(ref baseCycles)); SetZeroAndNegativeFlags(_a); _cycles = baseCycles; }
     private void EOR_INDX() { _a ^= Read(Addr_INDX()); SetZeroAndNegativeFlags(_a); _cycles = 6; }
     private void EOR_INDY() { byte baseCycles = 5; _a ^= Read(Addr_INDY(ref baseCycles)); SetZeroAndNegativeFlags(_a); _cycles = baseCycles; }
 
     // ORA (Logical Inclusive OR)
-    private void ORA_IMM() { _a |= Read(Addr_IMM()); SetZeroAndNegativeFlags(_a); _cycles = 2; }
-    private void ORA_ZP() { _a |= Read(Addr_ZP()); SetZeroAndNegativeFlags(_a); _cycles = 3; }
-    private void ORA_ZPX() { _a |= Read(Addr_ZPX()); SetZeroAndNegativeFlags(_a); _cycles = 4; }
-    private void ORA_ABS() { _a |= Read(Addr_ABS()); SetZeroAndNegativeFlags(_a); _cycles = 4; }
+    private void ORA_IMM() { _a |= Read(Addr_IMM()); SetZeroAndNegativeFlags(_a); _cycles = 1; } // 2 total cycles
+    private void ORA_ZP() { _a |= Read(Addr_ZP()); SetZeroAndNegativeFlags(_a); _cycles = 2; } // 3 total cycles
+    private void ORA_ZPX() { _a |= Read(Addr_ZPX()); SetZeroAndNegativeFlags(_a); _cycles = 3; } // 4 total cycles
+    private void ORA_ABS() { _a |= Read(Addr_ABS()); SetZeroAndNegativeFlags(_a); _cycles = 3; } // 4 total cycles
     private void ORA_ABSX() { byte baseCycles = 4; _a |= Read(Addr_ABSX(ref baseCycles)); SetZeroAndNegativeFlags(_a); _cycles = baseCycles; }
     private void ORA_ABSY() { byte baseCycles = 4; _a |= Read(Addr_ABSY(ref baseCycles)); SetZeroAndNegativeFlags(_a); _cycles = baseCycles; }
     private void ORA_INDX() { _a |= Read(Addr_INDX()); SetZeroAndNegativeFlags(_a); _cycles = 6; }
     private void ORA_INDY() { byte baseCycles = 5; _a |= Read(Addr_INDY(ref baseCycles)); SetZeroAndNegativeFlags(_a); _cycles = baseCycles; }
 
     // ADC (Add with Carry)
-    private void ADC(byte operand)
-    {
-        ushort sum = (ushort)(_a + operand + (_p.Carry ? 1 : 0));
-        _p.Carry = sum > 0xFF;
-        _p.Overflow = (~(_a ^ operand) & (_a ^ sum) & 0x80) != 0;
-        _a = (byte)sum;
-        SetZeroAndNegativeFlags(_a);
-    }
-    private void ADC_IMM() { ADC(Read(Addr_IMM())); _cycles = 2; }
-    private void ADC_ZP() { ADC(Read(Addr_ZP())); _cycles = 3; }
-    private void ADC_ZPX() { ADC(Read(Addr_ZPX())); _cycles = 4; }
-    private void ADC_ABS() { ADC(Read(Addr_ABS())); _cycles = 4; }
+    private void ADC(byte operand) { ushort sum = (ushort)(_a + operand + (_p.Carry ? 1 : 0)); _p.Carry = sum > 0xFF; _p.Overflow = (~(_a ^ operand) & (_a ^ sum) & 0x80) != 0; _a = (byte)sum; SetZeroAndNegativeFlags(_a); }
+    private void ADC_IMM() { ADC(Read(Addr_IMM())); _cycles = 1; } // 2 total cycles
+    private void ADC_ZP() { ADC(Read(Addr_ZP())); _cycles = 2; } // 3 total cycles
+    private void ADC_ZPX() { ADC(Read(Addr_ZPX())); _cycles = 3; } // 4 total cycles
+    private void ADC_ABS() { ADC(Read(Addr_ABS())); _cycles = 3; } // 4 total cycles
     private void ADC_ABSX() { byte baseCycles = 4; ADC(Read(Addr_ABSX(ref baseCycles))); _cycles = baseCycles; }
     private void ADC_ABSY() { byte baseCycles = 4; ADC(Read(Addr_ABSY(ref baseCycles))); _cycles = baseCycles; }
     private void ADC_INDX() { ADC(Read(Addr_INDX())); _cycles = 6; }
     private void ADC_INDY() { byte baseCycles = 5; ADC(Read(Addr_INDY(ref baseCycles))); _cycles = baseCycles; }
 
     // SBC (Subtract with Carry) - Implemented as ADC with a complemented operand
-    private void SBC_IMM() { ADC((byte)~Read(Addr_IMM())); _cycles = 2; }
-    private void SBC_ZP() { ADC((byte)~Read(Addr_ZP())); _cycles = 3; }
-    private void SBC_ZPX() { ADC((byte)~Read(Addr_ZPX())); _cycles = 4; }
-    private void SBC_ABS() { ADC((byte)~Read(Addr_ABS())); _cycles = 4; }
+    private void SBC_IMM() { ADC((byte)~Read(Addr_IMM())); _cycles = 1; } // 2 total cycles
+    private void SBC_ZP() { ADC((byte)~Read(Addr_ZP())); _cycles = 2; } // 3 total cycles
+    private void SBC_ZPX() { ADC((byte)~Read(Addr_ZPX())); _cycles = 3; } // 4 total cycles
+    private void SBC_ABS() { ADC((byte)~Read(Addr_ABS())); _cycles = 3; } // 4 total cycles
     private void SBC_ABSX() { byte baseCycles = 4; ADC((byte)~Read(Addr_ABSX(ref baseCycles))); _cycles = baseCycles; }
     private void SBC_ABSY() { byte baseCycles = 4; ADC((byte)~Read(Addr_ABSY(ref baseCycles))); _cycles = baseCycles; }
     private void SBC_INDX() { ADC((byte)~Read(Addr_INDX())); _cycles = 6; }
     private void SBC_INDY() { byte baseCycles = 5; ADC((byte)~Read(Addr_INDY(ref baseCycles))); _cycles = baseCycles; }
 
     // STA (Store Accumulator)
-    private void STA_ZP() { Write(Addr_ZP(), _a); _cycles = 3; }
-    private void STA_ZPX() { Write(Addr_ZPX(), _a); _cycles = 4; }
-    private void STA_ABS() { Write(Addr_ABS(), _a); _cycles = 4; }
-    private void STA_ABSX() { Write(Addr_ABSX_Write(), _a); _cycles = 5; }
-    private void STA_ABSY() { Write(Addr_ABSY_Write(), _a); _cycles = 5; }
+    private void STA_ZP() { Write(Addr_ZP(), _a); _cycles = 2; } // 3 total cycles
+    private void STA_ZPX() { Write(Addr_ZPX(), _a); _cycles = 3; } // 4 total cycles
+    private void STA_ABS() { Write(Addr_ABS(), _a); _cycles = 3; } // 4 total cycles
+    private void STA_ABSX() { Write(Addr_ABSX_Write(), _a); _cycles = 4; } // 5 total cycles
+    private void STA_ABSY() { Write(Addr_ABSY_Write(), _a); _cycles = 4; } // 5 total cycles
     private void STA_INDX() { Write(Addr_INDX(), _a); _cycles = 6; }
     private void STA_INDY() { Write(Addr_INDY_Write(), _a); _cycles = 6; }
 
     // STX (Store Index X)
-    private void STX_ZP() { Write(Addr_ZP(), _x); _cycles = 3; }
-    private void STX_ZPY() { Write(Addr_ZPY(), _x); _cycles = 4; }
-    private void STX_ABS() { Write(Addr_ABS(), _x); _cycles = 4; }
+    private void STX_ZP() { Write(Addr_ZP(), _x); _cycles = 2; } // 3 total cycles
+    private void STX_ZPY() { Write(Addr_ZPY(), _x); _cycles = 3; } // 4 total cycles
+    private void STX_ABS() { Write(Addr_ABS(), _x); _cycles = 3; } // 4 total cycles
 
     // STY (Store Index Y)
-    private void STY_ZP() { Write(Addr_ZP(), _y); _cycles = 3; }
-    private void STY_ZPX() { Write(Addr_ZPX(), _y); _cycles = 4; }
-    private void STY_ABS() { Write(Addr_ABS(), _y); _cycles = 4; }
+    private void STY_ZP() { Write(Addr_ZP(), _y); _cycles = 2; } // 3 total cycles
+    private void STY_ZPX() { Write(Addr_ZPX(), _y); _cycles = 3; } // 4 total cycles
+    private void STY_ABS() { Write(Addr_ABS(), _y); _cycles = 3; } // 4 total cycles
 
     // INC (Increment Memory)
     private void INC_ZP() { ushort addr = Addr_ZP(); byte val = (byte)(Read(addr) + 1); Write(addr, val); SetZeroAndNegativeFlags(val); _cycles = 5; }
     private void INC_ZPX() { ushort addr = Addr_ZPX(); byte val = (byte)(Read(addr) + 1); Write(addr, val); SetZeroAndNegativeFlags(val); _cycles = 6; }
-    private void INC_ABS() { ushort addr = Addr_ABS(); byte val = (byte)(Read(addr) + 1); Write(addr, val); SetZeroAndNegativeFlags(val); _cycles = 6; }
-    private void INC_ABSX() { ushort addr = Addr_ABSX_Write(); byte val = (byte)(Read(addr) + 1); Write(addr, val); SetZeroAndNegativeFlags(val); _cycles = 7; }
+    private void INC_ABS() { ushort addr = Addr_ABS(); byte val = (byte)(Read(addr) + 1); Write(addr, val); _cycles = 6; }
+    private void INC_ABSX() { ushort addr = Addr_ABSX_Write(); byte val = (byte)(Read(addr) + 1); Write(addr, val); _cycles = 7; }
 
     // DEC (Decrement Memory)
     private void DEC_ZP() { ushort addr = Addr_ZP(); byte val = (byte)(Read(addr) - 1); Write(addr, val); SetZeroAndNegativeFlags(val); _cycles = 5; }
     private void DEC_ZPX() { ushort addr = Addr_ZPX(); byte val = (byte)(Read(addr) - 1); Write(addr, val); SetZeroAndNegativeFlags(val); _cycles = 6; }
-    private void DEC_ABS() { ushort addr = Addr_ABS(); byte val = (byte)(Read(addr) - 1); Write(addr, val); SetZeroAndNegativeFlags(val); _cycles = 6; }
-    private void DEC_ABSX() { ushort addr = Addr_ABSX_Write(); byte val = (byte)(Read(addr) - 1); Write(addr, val); SetZeroAndNegativeFlags(val); _cycles = 7; }
+    private void DEC_ABS() { ushort addr = Addr_ABS(); byte val = (byte)(Read(addr) - 1); Write(addr, val); _cycles = 6; }
+    private void DEC_ABSX() { ushort addr = Addr_ABSX_Write(); byte val = (byte)(Read(addr) - 1); Write(addr, val); _cycles = 7; }
 
     // INX, INY, DEX, DEY (Increment/Decrement Registers)
-    private void INX_IMP() { _x++; SetZeroAndNegativeFlags(_x); _cycles = 2; }
-    private void INY_IMP() { _y++; SetZeroAndNegativeFlags(_y); _cycles = 2; }
-    private void DEX_IMP() { _x--; SetZeroAndNegativeFlags(_x); _cycles = 2; }
-    private void DEY_IMP() { _y--; SetZeroAndNegativeFlags(_y); _cycles = 2; }
+    private void INX_IMP() { _x++; SetZeroAndNegativeFlags(_x); _cycles = 1; } // 2 total cycles
+    private void INY_IMP() { _y++; SetZeroAndNegativeFlags(_y); _cycles = 1; } // 2 total cycles
+    private void DEX_IMP() { _x--; SetZeroAndNegativeFlags(_x); _cycles = 1; } // 2 total cycles
+    private void DEY_IMP() { _y--; SetZeroAndNegativeFlags(_y); _cycles = 1; } // 2 total cycles
 
     // --- Compare and Bit Test ---
 
@@ -511,47 +502,41 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     }
 
     // CMP (Compare Accumulator)
-    private void CMP_IMM() { Compare(_a, Read(Addr_IMM())); _cycles = 2; }
-    private void CMP_ZP() { Compare(_a, Read(Addr_ZP())); _cycles = 3; }
-    private void CMP_ZPX() { Compare(_a, Read(Addr_ZPX())); _cycles = 4; }
-    private void CMP_ABS() { Compare(_a, Read(Addr_ABS())); _cycles = 4; }
+    private void CMP_IMM() { Compare(_a, Read(Addr_IMM())); _cycles = 1; } // 2 total cycles
+    private void CMP_ZP() { Compare(_a, Read(Addr_ZP())); _cycles = 2; } // 3 total cycles
+    private void CMP_ZPX() { Compare(_a, Read(Addr_ZPX())); _cycles = 3; } // 4 total cycles
+    private void CMP_ABS() { Compare(_a, Read(Addr_ABS())); _cycles = 3; } // 4 total cycles
     private void CMP_ABSX() { byte baseCycles = 4; Compare(_a, Read(Addr_ABSX(ref baseCycles))); _cycles = baseCycles; }
     private void CMP_ABSY() { byte baseCycles = 4; Compare(_a, Read(Addr_ABSY(ref baseCycles))); _cycles = baseCycles; }
     private void CMP_INDX() { Compare(_a, Read(Addr_INDX())); _cycles = 6; }
     private void CMP_INDY() { byte baseCycles = 5; Compare(_a, Read(Addr_INDY(ref baseCycles))); _cycles = baseCycles; }
 
     // CPX (Compare X Register)
-    private void CPX_IMM() { Compare(_x, Read(Addr_IMM())); _cycles = 2; }
-    private void CPX_ZP() { Compare(_x, Read(Addr_ZP())); _cycles = 3; }
-    private void CPX_ABS() { Compare(_x, Read(Addr_ABS())); _cycles = 4; }
+    private void CPX_IMM() { Compare(_x, Read(Addr_IMM())); _cycles = 1; } // 2 total cycles
+    private void CPX_ZP() { Compare(_x, Read(Addr_ZP())); _cycles = 2; } // 3 total cycles
+    private void CPX_ABS() { Compare(_x, Read(Addr_ABS())); _cycles = 3; } // 4 total cycles
 
     // CPY (Compare Y Register)
-    private void CPY_IMM() { Compare(_y, Read(Addr_IMM())); _cycles = 2; }
-    private void CPY_ZP() { Compare(_y, Read(Addr_ZP())); _cycles = 3; }
-    private void CPY_ABS() { Compare(_y, Read(Addr_ABS())); _cycles = 4; }
+    private void CPY_IMM() { Compare(_y, Read(Addr_IMM())); _cycles = 1; } // 2 total cycles
+    private void CPY_ZP() { Compare(_y, Read(Addr_ZP())); _cycles = 2; } // 3 total cycles
+    private void CPY_ABS() { Compare(_y, Read(Addr_ABS())); _cycles = 3; } // 4 total cycles
 
     // BIT (Test Bits)
-    private void BIT(ushort addr)
-    {
-        byte operand = Read(addr);
-        _p.Zero = (_a & operand) == 0;
-        _p.Overflow = (operand & 0x40) != 0; // Bit 6 of operand
-        _p.Negative = (operand & 0x80) != 0; // Bit 7 of operand
-    }
+    private void BIT(ushort addr) { byte operand = Read(addr); _p.Zero = (_a & operand) == 0; _p.Overflow = (operand & 0x40) != 0; _p.Negative = (operand & 0x80) != 0; }
     private void BIT_ZP() { BIT(Addr_ZP()); _cycles = 3; }
     private void BIT_ABS() { BIT(Addr_ABS()); _cycles = 4; }
 
     // ASL (Arithmetic Shift Left)
     private byte ASL(byte operand) { _p.Carry = (operand & 0x80) != 0; byte result = (byte)(operand << 1); SetZeroAndNegativeFlags(result); return result; }
-    private void ASL_ACC() { _a = ASL(_a); _cycles = 2; }
+    private void ASL_ACC() { _a = ASL(_a); _cycles = 1; } // 2 total cycles
     private void ASL_ZP() { ushort addr = Addr_ZP(); byte val = Read(addr); val = ASL(val); Write(addr, val); _cycles = 5; }
     private void ASL_ZPX() { ushort addr = Addr_ZPX(); byte val = Read(addr); val = ASL(val); Write(addr, val); _cycles = 6; }
-    private void ASL_ABS() { ushort addr = Addr_ABS(); byte val = Read(addr); val = ASL(val); Write(addr, val); _cycles = 6; }
+    private void ASL_ABS() { ushort addr = Addr_ABS(); byte val = Read(addr); val = ASL(val); _cycles = 6; }
     private void ASL_ABSX() { ushort addr = Addr_ABSX_Write(); byte val = Read(addr); val = ASL(val); Write(addr, val); _cycles = 7; }
 
     // LSR (Logical Shift Right)
     private byte LSR(byte operand) { _p.Carry = (operand & 0x01) != 0; byte result = (byte)(operand >> 1); SetZeroAndNegativeFlags(result); return result; }
-    private void LSR_ACC() { _a = LSR(_a); _cycles = 2; }
+    private void LSR_ACC() { _a = LSR(_a); _cycles = 1; } // 2 total cycles
     private void LSR_ZP() { ushort addr = Addr_ZP(); byte val = Read(addr); val = LSR(val); Write(addr, val); _cycles = 5; }
     private void LSR_ZPX() { ushort addr = Addr_ZPX(); byte val = Read(addr); val = LSR(val); Write(addr, val); _cycles = 6; }
     private void LSR_ABS() { ushort addr = Addr_ABS(); byte val = Read(addr); val = LSR(val); Write(addr, val); _cycles = 6; }
@@ -566,7 +551,7 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
         SetZeroAndNegativeFlags(result);
         return result;
     }
-    private void ROL_ACC() { _a = ROL(_a); _cycles = 2; }
+    private void ROL_ACC() { _a = ROL(_a); _cycles = 1; } // 2 total cycles
     private void ROL_ZP() { ushort addr = Addr_ZP(); byte val = Read(addr); val = ROL(val); Write(addr, val); _cycles = 5; }
     private void ROL_ZPX() { ushort addr = Addr_ZPX(); byte val = Read(addr); val = ROL(val); Write(addr, val); _cycles = 6; }
     private void ROL_ABS() { ushort addr = Addr_ABS(); byte val = Read(addr); val = ROL(val); Write(addr, val); _cycles = 6; }
@@ -581,7 +566,7 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
         SetZeroAndNegativeFlags(result);
         return result;
     }
-    private void ROR_ACC() { _a = ROR(_a); _cycles = 2; }
+    private void ROR_ACC() { _a = ROR(_a); _cycles = 1; } // 2 total cycles
     private void ROR_ZP() { ushort addr = Addr_ZP(); byte val = Read(addr); val = ROR(val); Write(addr, val); _cycles = 5; }
     private void ROR_ZPX() { ushort addr = Addr_ZPX(); byte val = Read(addr); val = ROR(val); Write(addr, val); _cycles = 6; }
     private void ROR_ABS() { ushort addr = Addr_ABS(); byte val = Read(addr); val = ROR(val); Write(addr, val); _cycles = 6; }
@@ -648,17 +633,17 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     // --- Register Transfer Instructions ---
 
     // TAX (Transfer Accumulator to X)
-    private void TAX_IMP() { _x = _a; SetZeroAndNegativeFlags(_x); _cycles = 2; }
+    private void TAX_IMP() { _x = _a; SetZeroAndNegativeFlags(_x); _cycles = 1; } // 2 total cycles
     // TAY (Transfer Accumulator to Y)
-    private void TAY_IMP() { _y = _a; SetZeroAndNegativeFlags(_y); _cycles = 2; }
+    private void TAY_IMP() { _y = _a; SetZeroAndNegativeFlags(_y); _cycles = 1; } // 2 total cycles
     // TXA (Transfer X to Accumulator)
-    private void TXA_IMP() { _a = _x; SetZeroAndNegativeFlags(_a); _cycles = 2; }
+    private void TXA_IMP() { _a = _x; SetZeroAndNegativeFlags(_a); _cycles = 1; } // 2 total cycles
     // TYA (Transfer Y to Accumulator)
-    private void TYA_IMP() { _a = _y; SetZeroAndNegativeFlags(_a); _cycles = 2; }
+    private void TYA_IMP() { _a = _y; SetZeroAndNegativeFlags(_a); _cycles = 1; } // 2 total cycles
     // TSX (Transfer Stack Pointer to X)
-    private void TSX_IMP() { _x = _sp; SetZeroAndNegativeFlags(_x); _cycles = 2; }
+    private void TSX_IMP() { _x = _sp; SetZeroAndNegativeFlags(_x); _cycles = 1; } // 2 total cycles
     // TXS (Transfer X to Stack Pointer)
-    private void TXS_IMP() { _sp = _x; _cycles = 2; }
+    private void TXS_IMP() { _sp = _x; _cycles = 1; } // 2 total cycles
 
     // --- Flag and System Instructions ---
 
@@ -681,11 +666,12 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
     private void BRK_IMP()
     {
         _pc++; // BRK is a 2-byte instruction in practice
-        _p.InterruptDisable = true;
         Push((byte)(_pc >> 8));
         Push((byte)(_pc & 0xFF));
+        // For BRK, both B and U flags are set when pushing to stack.
         Push((byte)(_p.Value | 0b00110000)); // Set B and unused bit 5
-
+        _p.InterruptDisable = true;
+        
         ushort lo = Read(0xFFFE);
         ushort hi = Read(0xFFFF);
         _pc = (ushort)((hi << 8) | lo);
