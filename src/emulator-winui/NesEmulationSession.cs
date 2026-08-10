@@ -75,6 +75,9 @@ internal sealed class NesEmulationSession : IAsyncDisposable
         }
     }
 
+    public void SetControllerState(NesControllerButton buttons) =>
+        _nes.SetControllerState(0, buttons);
+
     public async Task StopAsync()
     {
         Task? runTask;

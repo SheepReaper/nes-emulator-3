@@ -6,6 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="using:EmuSheep"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    IsTabStop="True"
     mc:Ignorable="d">
 
     <Grid Padding="24" RowSpacing="16">
@@ -72,7 +73,7 @@
                             Text="No ROM loaded" />
                         <TextBlock
                             Foreground="#B3FFFFFF"
-                            Text="Open a Mapper 0 .nes file to begin"
+                            Text="Open a .nes file to begin"
                             TextAlignment="Center" />
                     </StackPanel>
                 </Grid>
@@ -89,14 +90,25 @@
                 Width="16"
                 Height="16"
                 IsActive="False" />
-            <TextBlock
-                x:Name="StatusText"
-                Grid.Column="1"
-                VerticalAlignment="Center"
-                AutomationProperties.LiveSetting="Polite"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="No ROM loaded"
-                TextTrimming="CharacterEllipsis" />
+            <Grid Grid.Column="1" ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    x:Name="StatusText"
+                    VerticalAlignment="Center"
+                    AutomationProperties.LiveSetting="Polite"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="No ROM loaded"
+                    TextTrimming="CharacterEllipsis" />
+                <TextBlock
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    AutomationProperties.Name="Keyboard controls"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="Arrows: Move · Z: A · X: B · Enter: Start · Shift: Select" />
+            </Grid>
         </Grid>
     </Grid>
 </Page>

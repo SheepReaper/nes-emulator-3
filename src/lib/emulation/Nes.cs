@@ -85,6 +85,11 @@ public sealed class Nes
         lock (_sync) ResetUnsafe();
     }
 
+    public void SetControllerState(int controller, NesControllerButton buttons)
+    {
+        lock (_sync) _cpuBus.SetControllerState(controller, (byte)buttons);
+    }
+
     private void ResetUnsafe()
     {
         _debugger.ResetTransientStateUnsafe();

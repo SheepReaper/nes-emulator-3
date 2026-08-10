@@ -24,7 +24,7 @@ public partial class App : Application
     /// <summary>
     /// Gets the application's primary window.
     /// </summary>
-    public Window MainWindow { get; private set; } = null!;
+    public MainWindow MainWindow { get; private set; } = null!;
     
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code

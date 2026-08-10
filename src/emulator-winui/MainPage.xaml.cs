@@ -35,6 +35,7 @@ public sealed partial class MainPage : Page
         InitializeComponent();
         _pixelBufferStream = _frameBitmap.PixelBuffer.AsStream();
         NesDisplay.Source = _frameBitmap;
+        Loaded += MainPage_Loaded;
         Unloaded += MainPage_Unloaded;
     }
 
@@ -142,6 +143,7 @@ public sealed partial class MainPage : Page
 
         replacement.FrameAvailable += Session_FrameAvailable;
         replacement.Faulted += Session_Faulted;
+        replacement.SetControllerState(((App)Application.Current).MainWindow.ControllerButtons);
         _session = replacement;
         _romFileName = fileName;
         EmptyState.Visibility = Visibility.Collapsed;
@@ -209,9 +211,19 @@ public sealed partial class MainPage : Page
         StatusText.Text = $"Loading · {fileName}";
     }
 
+    private void MainPage_Loaded(object sender, RoutedEventArgs e)
+    {
+        Focus(FocusState.Programmatic);
+        ((App)Application.Current).MainWindow.ControllerStateChanged += MainWindow_ControllerStateChanged;
+    }
+
+    private void MainWindow_ControllerStateChanged(NesControllerButton buttons) =>
+        _session?.SetControllerState(buttons);
+
     private async void MainPage_Unloaded(object sender, RoutedEventArgs e)
     {
         _isUnloaded = true;
+        ((App)Application.Current).MainWindow.ControllerStateChanged -= MainWindow_ControllerStateChanged;
         await StopAndDisposeSessionAsync();
         _pixelBufferStream.Dispose();
     }

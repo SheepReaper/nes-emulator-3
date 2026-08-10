@@ -136,6 +136,26 @@ public sealed class BusTests
     }
 
     [Fact]
+    public void Nes_ControllerStateIsExposedThroughTheCpuControllerPort()
+    {
+        var nes = new Nes();
+        nes.SetControllerState(0, NesControllerButton.A | NesControllerButton.Start | NesControllerButton.Left);
+
+        Assert.Equal(1, nes.Debugger.PeekCpuMemory(0x4016));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(2)]
+    public void Nes_ControllerStateRejectsInvalidControllerIndex(int controller)
+    {
+        var nes = new Nes();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            nes.SetControllerState(controller, NesControllerButton.A));
+    }
+
+    [Fact]
     public void PpuBus_PatternTablesRouteToCartridgeAndFourteenBitMirror()
     {
         var cartridge = new RecordingCartridge(NametableMirroring.Vertical);

@@ -13,6 +13,7 @@
     <Compile Include="..\..\src\emulator-winui\NesEmulationSession.cs" Link="NesEmulationSession.cs" />
     <Compile Include="..\..\src\emulator-winui\StartupRomOptions.cs" Link="StartupRomOptions.cs" />
     <Compile Include="..\..\src\emulator-winui\InitialWindowLayout.cs" Link="InitialWindowLayout.cs" />
+    <Compile Include="..\..\src\emulator-winui\KeyboardControllerState.cs" Link="KeyboardControllerState.cs" />
   </ItemGroup>
 
   <ItemGroup>
