@@ -46,7 +46,7 @@ public sealed class BusTests
         bus.Write(0x4016, 0x55);
         bus.Write(0x4017, 0x55);
 
-        Assert.Equal(0, bus.Read(0x4015));
+        Assert.Equal(0x10, bus.Read(0x4015)); // $4015 write enabled the one-byte DMC sample.
         Assert.Equal(0, bus.Read(0x4016));
         Assert.Equal(0, bus.Read(0x4017));
     }
@@ -92,8 +92,9 @@ public sealed class BusTests
         ppu.Write(0x2003, 0x80);
 
         bus.Write(0x4014, 0x02);
+        for (ulong cycle = 0; cycle < 513; cycle++) Assert.True(bus.ClockDma(cycle));
 
-        Assert.Equal(513, GetPrivateField<int>(cpu, "_cycles"));
+        Assert.False(bus.ClockDma(513));
         ppu.Write(0x2003, 0x80);
         Assert.Equal(0x00, ppu.Read(0x2004));
         ppu.Write(0x2003, 0x7F);
@@ -104,11 +105,10 @@ public sealed class BusTests
     public void CpuBus_OamDmaAddsAlignmentCycleOnOddCpuCycle()
     {
         var (bus, _, _, cpu) = CreateCpuBus();
-        SetPrivateField(cpu, "_masterClock", 1UL);
-
         bus.Write(0x4014, 0x00);
+        for (ulong cycle = 1; cycle < 515; cycle++) Assert.True(bus.ClockDma(cycle));
 
-        Assert.Equal(514, GetPrivateField<int>(cpu, "_cycles"));
+        Assert.False(bus.ClockDma(515));
     }
 
     [Fact]
@@ -272,7 +272,7 @@ public sealed class BusTests
         slot.Insert(cartridge);
         var ppuBus = new PpuBus(slot);
         ppu.ConnectBus(ppuBus);
-        var bus = new CpuBus(cpu, ppu, apu, slot);
+        var bus = new CpuBus(ppu, apu, slot);
         cpu.ConnectBus(bus);
         return (bus, cartridge, ppu, cpu);
     }

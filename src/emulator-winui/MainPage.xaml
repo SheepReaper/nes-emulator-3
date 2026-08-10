@@ -47,6 +47,14 @@
             Severity="Error"
             Title="Could not load the ROM" />
 
+        <InfoBar
+            x:Name="AudioInfoBar"
+            Grid.Row="1"
+            IsClosable="True"
+            IsOpen="False"
+            Severity="Warning"
+            Title="Audio unavailable" />
+
         <Border
             Grid.Row="2"
             MinHeight="240"
@@ -94,6 +102,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock
                     x:Name="StatusText"
@@ -108,6 +117,30 @@
                     AutomationProperties.Name="Keyboard controls"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     Text="Arrows: Move · Z: A · X: B · Enter: Start · Shift: Select" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                    <ToggleButton
+                        x:Name="MuteButton"
+                        Click="MuteButton_Click"
+                        Content="Mute"
+                        IsEnabled="False" />
+                    <Slider
+                        x:Name="VolumeSlider"
+                        Width="96"
+                        AutomationProperties.Name="Volume"
+                        IsEnabled="False"
+                        Maximum="100"
+                        Value="100"
+                        ValueChanged="VolumeSlider_ValueChanged" />
+                    <ComboBox
+                        x:Name="FilterSelector"
+                        Width="100"
+                        IsEnabled="False"
+                        SelectionChanged="FilterSelector_SelectionChanged"
+                        SelectedIndex="0">
+                        <ComboBoxItem Content="NES filter" />
+                        <ComboBoxItem Content="Raw" />
+                    </ComboBox>
+                </StackPanel>
             </Grid>
         </Grid>
     </Grid>

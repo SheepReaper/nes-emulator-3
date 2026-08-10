@@ -15,6 +15,7 @@ internal sealed class NesEmulationSession : IAsyncDisposable
     private readonly CancellationTokenSource _cancellation = new();
 
     private Task? _runTask;
+    private NesAudioPlayer? _audioPlayer;
     private ulong _latestFrameNumber;
     private bool _hasFrame;
     private bool _disposed;
@@ -28,6 +29,26 @@ internal sealed class NesEmulationSession : IAsyncDisposable
 
     public event EventHandler? FrameAvailable;
     public event EventHandler<EmulationFaultedEventArgs>? Faulted;
+    public event EventHandler<EmulationFaultedEventArgs>? AudioUnavailable;
+
+    public bool HasAudio => _audioPlayer != null;
+
+    public async Task InitializeAudioAsync()
+    {
+        try
+        {
+            _audioPlayer = await NesAudioPlayer.CreateAsync(_nes);
+        }
+        catch (Exception exception)
+        {
+            _audioPlayer = null;
+            AudioUnavailable?.Invoke(this, new EmulationFaultedEventArgs(exception));
+        }
+    }
+
+    public void SetMuted(bool muted) { if (_audioPlayer != null) _audioPlayer.IsMuted = muted; }
+    public void SetVolume(double volume) => _audioPlayer?.SetVolume(volume);
+    public void SetFilterMode(NesAudioFilterMode mode) => _nes.AudioFilterMode = mode;
 
     public bool IsRunning
     {
@@ -106,6 +127,7 @@ internal sealed class NesEmulationSession : IAsyncDisposable
         }
 
         await StopAsync().ConfigureAwait(false);
+        if (_audioPlayer != null) await _audioPlayer.DisposeAsync().ConfigureAwait(false);
         _cancellation.Dispose();
     }
 
@@ -133,6 +155,17 @@ internal sealed class NesEmulationSession : IAsyncDisposable
 
                 cancellationToken.ThrowIfCancellationRequested();
                 FrameAvailable?.Invoke(this, EventArgs.Empty);
+
+                if (_audioPlayer != null)
+                {
+                    // Keep roughly 30-50 ms queued. Device demand, rather than
+                    // video presentation, determines how quickly emulation runs.
+                    while (_nes.BufferedAudioSampleCount >= 2_400)
+                    {
+                        await Task.Delay(2, cancellationToken).ConfigureAwait(false);
+                    }
+                    continue;
+                }
 
                 nextFrameDeadline += frameDurationTicks;
                 var remainingTicks = nextFrameDeadline - stopwatch.ElapsedTicks;

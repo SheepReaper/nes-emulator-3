@@ -10,7 +10,7 @@ public sealed class TestRomManifestTests
         var manifest = TestRomManifest.Load(Path.Combine(AppContext.BaseDirectory, "test-roms.json"));
 
         Assert.Equal("95d8f621ae55cee0d09b91519a8989ae0e64753b", manifest.UpstreamCommit);
-        Assert.Equal(15, manifest.Tests.Length);
+        Assert.Equal(52, manifest.Tests.Length);
         Assert.All(manifest.Tests, test =>
         {
             Assert.NotEmpty(test.Suite);

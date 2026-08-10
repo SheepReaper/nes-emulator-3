@@ -50,7 +50,7 @@ public sealed class DebuggerTests
         Assert.Equal(0, snapshot.Ppu.Scanline);
         Assert.Equal(0, snapshot.Ppu.Dot);
         Assert.NotNull(snapshot.Apu);
-        Assert.False(snapshot.Apu.IsImplemented);
+        Assert.True(snapshot.Apu.IsImplemented);
         Assert.Equal(0x18, snapshot.Apu.Registers.Length);
         Assert.NotNull(snapshot.Timing);
         Assert.Equal(NesVideoStandard.Pal, snapshot.Timing.VideoStandard);

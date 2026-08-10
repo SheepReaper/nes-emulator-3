@@ -66,6 +66,11 @@ internal static class CpuOpcodeTable
         Add(0x4B, "ASR", CpuAddressingMode.Immediate, 2, 2, false);
         Add(0x6B, "ARR", CpuAddressingMode.Immediate, 2, 2, false);
         Add(0xAB, "ATX", CpuAddressingMode.Immediate, 2, 2, false);
+        Add(0x8B, "XAA", CpuAddressingMode.Immediate, 2, 2, false);
+        Add(0x93, "AHX", CpuAddressingMode.IndirectIndexed, 2, 6, false);
+        Add(0x9B, "TAS", CpuAddressingMode.AbsoluteY, 3, 5, false);
+        Add(0x9F, "AHX", CpuAddressingMode.AbsoluteY, 3, 5, false);
+        Add(0xBB, "LAS", CpuAddressingMode.AbsoluteY, 3, 4, false);
         Add(0xCB, "AXS", CpuAddressingMode.Immediate, 2, 2, false);
         Add(0x07, "SLO", CpuAddressingMode.ZeroPage, 2, 5, false);
         Add(0x27, "RLA", CpuAddressingMode.ZeroPage, 2, 5, false);

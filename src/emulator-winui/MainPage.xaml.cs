@@ -134,6 +134,8 @@ public sealed partial class MainPage : Page
     private async Task StartRomAsync(string fileName, byte[] romData)
     {
         var replacement = new NesEmulationSession(romData);
+        replacement.AudioUnavailable += Session_AudioUnavailable;
+        await replacement.InitializeAudioAsync();
         await StopAndDisposeSessionAsync();
         if (_isUnloaded)
         {
@@ -148,8 +150,32 @@ public sealed partial class MainPage : Page
         _romFileName = fileName;
         EmptyState.Visibility = Visibility.Collapsed;
         StatusText.Text = $"Running · {fileName}";
+        MuteButton.IsEnabled = replacement.HasAudio;
+        VolumeSlider.IsEnabled = replacement.HasAudio;
+        FilterSelector.IsEnabled = true;
+        replacement.SetMuted(MuteButton.IsChecked == true);
+        replacement.SetVolume(VolumeSlider.Value / 100.0);
+        replacement.SetFilterMode(FilterSelector.SelectedIndex == 1 ? NesAudioFilterMode.Raw : NesAudioFilterMode.Nes);
         replacement.Start();
     }
+
+    private void Session_AudioUnavailable(object? sender, EmulationFaultedEventArgs e)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            AudioInfoBar.Message = $"{e.Exception.Message} The game will continue silently.";
+            AudioInfoBar.IsOpen = true;
+        });
+    }
+
+    private void MuteButton_Click(object sender, RoutedEventArgs e) =>
+        _session?.SetMuted(MuteButton.IsChecked == true);
+
+    private void VolumeSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e) =>
+        _session?.SetVolume(e.NewValue / 100.0);
+
+    private void FilterSelector_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        _session?.SetFilterMode(FilterSelector.SelectedIndex == 1 ? NesAudioFilterMode.Raw : NesAudioFilterMode.Nes);
 
     private void Session_FrameAvailable(object? sender, EventArgs e)
     {
@@ -239,6 +265,7 @@ public sealed partial class MainPage : Page
         _session = null;
         session.FrameAvailable -= Session_FrameAvailable;
         session.Faulted -= Session_Faulted;
+        session.AudioUnavailable -= Session_AudioUnavailable;
         await session.DisposeAsync();
     }
 }

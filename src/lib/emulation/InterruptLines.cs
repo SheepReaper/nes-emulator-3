@@ -40,9 +40,11 @@ public sealed class InterruptLines
     internal bool DelayNmiOneInstruction { get; set; }
     public bool Irq
     {
-        get => field || MapperIrq;
+        get => field || MapperIrq || ApuFrameIrq || ApuDmcIrq;
         set;
     }
 
     internal bool MapperIrq { get; set; }
+    internal bool ApuFrameIrq { get; set; }
+    internal bool ApuDmcIrq { get; set; }
 }

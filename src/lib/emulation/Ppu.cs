@@ -162,6 +162,8 @@ public sealed class Ppu(
         for (var i = 0; i < data.Length; i++) _oam[(byte)(_oamAddress + i)] = data[i];
     }
 
+    internal void DmaWriteByte(byte value) => _oam[_oamAddress++] = value;
+
     public void Clock()
     {
         // Timing and fetch phases: https://www.nesdev.org/wiki/PPU_rendering

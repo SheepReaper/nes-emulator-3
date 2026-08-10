@@ -39,4 +39,5 @@ public sealed class CartridgeSlot
     internal void NotifyPpuAddress(ushort address, ulong ppuCycle) =>
         Cartridge?.NotifyPpuAddress(address, ppuCycle);
     internal void NotifyCpuClock() => Cartridge?.NotifyCpuClock();
+    internal double AudioOutput => Cartridge?.AudioOutput ?? 0;
 }

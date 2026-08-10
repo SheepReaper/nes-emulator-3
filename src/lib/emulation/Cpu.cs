@@ -302,6 +302,11 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
                 0x4B => ASR_IMM,
                 0x6B => ARR_IMM,
                 0xAB => ATX_IMM,
+                0x8B => XAA_IMM,
+                0x93 => AHX_INDY,
+                0x9B => TAS_ABSY,
+                0x9F => AHX_ABSY,
+                0xBB => LAS_ABSY,
                 0xCB => AXS_IMM,
 
                 // Stable unofficial zero-page instructions
@@ -387,12 +392,12 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
                 0x74 => () => { Addr_ZPX(); _cycles = 4; }, // DOP ZP,X
                 0xD4 => () => { Addr_ZPX(); _cycles = 4; }, // DOP ZP,X
                 0xF4 => () => { Addr_ZPX(); _cycles = 4; }, // DOP ZP,X
-                0x1C => () => { Addr_ABSX(); _cycles = 4; }, // TOP ABS,X
-                0x3C => () => { Addr_ABSX(); _cycles = 4; }, // TOP ABS,X
-                0x5C => () => { Addr_ABSX(); _cycles = 4; }, // TOP ABS,X
-                0x7C => () => { Addr_ABSX(); _cycles = 4; }, // TOP ABS,X
-                0xDC => () => { Addr_ABSX(); _cycles = 4; }, // TOP ABS,X
-                0xFC => () => { Addr_ABSX(); _cycles = 4; }, // TOP ABS,X
+                0x1C => () => { _cycles = 4; Addr_ABSX(); }, // TOP ABS,X
+                0x3C => () => { _cycles = 4; Addr_ABSX(); }, // TOP ABS,X
+                0x5C => () => { _cycles = 4; Addr_ABSX(); }, // TOP ABS,X
+                0x7C => () => { _cycles = 4; Addr_ABSX(); }, // TOP ABS,X
+                0xDC => () => { _cycles = 4; Addr_ABSX(); }, // TOP ABS,X
+                0xFC => () => { _cycles = 4; Addr_ABSX(); }, // TOP ABS,X
                 0x80 => () => { Addr_IMM(); _cycles = 2; }, // DOP IMM
                 0x82 => () => { Addr_IMM(); _cycles = 2; }, // DOP IMM
                 0x89 => () => { Addr_IMM(); _cycles = 2; }, // DOP IMM
@@ -983,6 +988,45 @@ public sealed class Cpu(InterruptLines interrupts) : IBusMaster
         _cycles = 4;
         if (IsIoAddress(address)) CompleteIoAccess(() => Write(address, _a));
         else Write(address, _a);
+    }
+
+    private void XAA_IMM()
+    {
+        // XAA is electrically unstable on NMOS parts. The 2A03's commonly
+        // observed deterministic component is X AND the immediate operand.
+        _a = (byte)(_x & Read(Addr_IMM()));
+        SetZeroAndNegativeFlags(_a);
+        _cycles = 2;
+    }
+
+    private void AHX_INDY()
+    {
+        var address = Addr_INDY_Write();
+        Write(address, (byte)(_a & _x & (((address >> 8) + 1) & 0xFF)));
+        _cycles = 6;
+    }
+
+    private void AHX_ABSY()
+    {
+        var address = Addr_ABSY_Write();
+        Write(address, (byte)(_a & _x & (((address >> 8) + 1) & 0xFF)));
+        _cycles = 5;
+    }
+
+    private void TAS_ABSY()
+    {
+        var address = Addr_ABSY_Write();
+        _sp = (byte)(_a & _x);
+        Write(address, (byte)(_sp & (((address >> 8) + 1) & 0xFF)));
+        _cycles = 5;
+    }
+
+    private void LAS_ABSY()
+    {
+        _cycles = 4;
+        var value = (byte)(Read(Addr_ABSY()) & _sp);
+        _a = _x = _sp = value;
+        SetZeroAndNegativeFlags(value);
     }
     private void STA_ABSX() { Write(Addr_ABSX_Write(), _a); _cycles = 5; }
     private void STA_ABSY() { Write(Addr_ABSY_Write(), _a); _cycles = 5; }

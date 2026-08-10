@@ -10,6 +10,7 @@ public sealed class Nes
     public const int FrameHeight = Ppu.FrameHeight;
     public const int BytesPerPixel = 4;
     public const int FrameBufferSize = Ppu.FrameBufferSize;
+    public const int AudioSampleRate = Apu.SampleRate;
 
     private readonly InterruptLines _interrupts = new();
     private readonly CartridgeSlot _cartridgeSlot = new();
@@ -41,12 +42,14 @@ public sealed class Nes
         _cartridgeFactory = new CartridgeFactory(_interrupts);
         _cpu = new Cpu(_interrupts);
         _ppu = new Ppu(_interrupts, videoStandard, Timing);
-        _apu = new Apu(_interrupts, Timing.ApuRegion);
+        _apu = new Apu(_interrupts, Timing.ApuRegion, Timing.MasterClockHz, Timing.CpuDivisor);
 
         _ppuBus = new PpuBus(_cartridgeSlot);
         _ppu.ConnectBus(_ppuBus);
 
-        _cpuBus = new CpuBus(_cpu, _ppu, _apu, _cartridgeSlot);
+        _cpuBus = new CpuBus(_ppu, _apu, _cartridgeSlot);
+        _apu.ConnectDmcDma(_cpuBus.RequestDmcDma);
+        _apu.ConnectCartridgeAudio(() => _cartridgeSlot.AudioOutput);
         _cpu.ConnectBus(_cpuBus);
         _ppu.FrameCompleted += OnFrameCompleted;
         _debugger = new NesDebugger(this);
@@ -58,6 +61,18 @@ public sealed class Nes
     public NesTiming Timing { get; }
     public INesDebugger Debugger { get; }
     public event EventHandler<FrameReadyEventArgs>? FrameReady;
+
+    public NesAudioFilterMode AudioFilterMode
+    {
+        get => _apu.FilterMode;
+        set { lock (_sync) _apu.FilterMode = value; }
+    }
+
+    public int BufferedAudioSampleCount => _apu.BufferedSampleCount;
+
+    public int ReadAudioSamples(Span<float> destination) => _apu.ReadAudioSamples(destination);
+
+    public void DiscardAudioSamples() => _apu.DiscardAudioSamples();
 
     public double RequestedSpeedMultiplier
     {
@@ -179,8 +194,10 @@ public sealed class Nes
         if (_cpuClockAccumulator >= Timing.CpuDivisor)
         {
             _cpuClockAccumulator -= Timing.CpuDivisor;
-            _cpu.Clock(_cpuClockCounter++);
+            if (!_cpuBus.ClockDma(_cpuClockCounter)) _cpu.Clock(_cpuClockCounter);
+            _apu.Clock();
             _cartridgeSlot.NotifyCpuClock();
+            _cpuClockCounter++;
         }
 
     }
