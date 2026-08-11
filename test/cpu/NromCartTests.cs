@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace SR.Emulation.Nes.Tests;
+namespace Sheep.Emulation.Nes.Tests;
 
 public sealed class NromCartTests
 {

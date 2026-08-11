@@ -1,0 +1,33 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/tester/tester.csproj" />
+    <Project Path="src/tools/nes-lab-contracts/Sheep.Nes.Lab.Contracts.csproj" />
+    <Project Path="src/tools/nes-lab/Sheep.Nes.Lab.csproj" />
+  </Folder>
+  <Folder Name="/src/emulator-winui/">
+    <Project Path="src/emulator-winui/EmuSheep.csproj">
+      <Platform Project="x64" />
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/src/lib/" />
+  <Folder Name="/src/lib/emulation/">
+    <Project Path="src/lib/emulation/Sheep.Emulation.Nes.csproj" />
+  </Folder>
+  <Folder Name="/src/lib/interop-winui/">
+    <Project Path="src/lib/interop-winui/Sheep.WinUI.Interop.csproj" />
+  </Folder>
+  <Folder Name="/test/" />
+  <Folder Name="/test/conformance/">
+    <Project Path="test/conformance/Sheep.Emulation.Nes.ConformanceTests.csproj" />
+  </Folder>
+  <Folder Name="/test/cpu/">
+    <Project Path="test/cpu/Sheep.Emulation.Nes.Tests.csproj" />
+  </Folder>
+  <Folder Name="/test/emulator-winui/">
+    <Project Path="test/emulator-winui/EmuSheep.Tests.csproj" />
+  </Folder>
+  <Folder Name="/bench/">
+    <Project Path="bench/Sheep.Emulation.Nes.Benchmarks/Sheep.Emulation.Nes.Benchmarks.csproj" />
+  </Folder>
+</Solution>

@@ -64,6 +64,8 @@ BenchmarkDotNet.Artifacts/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+.artifacts/
+.agents/mcp_config.json
 
 # Tye
 .tye/
