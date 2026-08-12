@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace SR.Emulation.Nes.ConformanceTests;
+namespace Sheep.Emulation.Nes.ConformanceTests;
 
 public sealed class BlarggProtocolTests
 {

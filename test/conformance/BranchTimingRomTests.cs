@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace SR.Emulation.Nes.ConformanceTests;
+namespace Sheep.Emulation.Nes.ConformanceTests;
 
 public sealed class BranchTimingRomTests
 {
@@ -27,7 +27,7 @@ public sealed class BranchTimingRomTests
         Assert.True(File.Exists(romPath), $"Missing test ROM: {romPath}");
         TestRomManifest.VerifyChecksum(definition, romPath);
 
-        var nes = new Nes(NesVideoStandard.Ntsc);
+        var nes = new NesSystem(NesVideoStandard.Ntsc);
         nes.LoadRom(File.ReadAllBytes(romPath));
         var terminal = LegacyRomTerminal.WaitForSelfJump(nes, MaximumPpuDots);
         var result = nes.Debugger.PeekCpuMemory(0x00F8);
@@ -42,7 +42,7 @@ public sealed class BranchTimingRomTests
 
 internal readonly record struct LegacyRomTerminal(ushort ProgramCounter, long ElapsedPpuDots)
 {
-    internal static LegacyRomTerminal WaitForSelfJump(Nes nes, long maximumPpuDots, int chunkSize = 25_000)
+    internal static LegacyRomTerminal WaitForSelfJump(NesSystem nes, long maximumPpuDots, int chunkSize = 25_000)
     {
         ushort? previousPc = null;
         var stableSamples = 0;
@@ -52,7 +52,7 @@ internal readonly record struct LegacyRomTerminal(ushort ProgramCounter, long El
             var dots = (int)Math.Min(chunkSize, maximumPpuDots - elapsed);
             nes.RunForPpuDots(dots);
             elapsed += dots;
-            var pc = nes.Debugger.CaptureSnapshot().Cpu!.ProgramCounter;
+            var pc = nes.Debugger.ProgramCounter;
             stableSamples = pc == previousPc ? stableSamples + 1 : 0;
             previousPc = pc;
             if (stableSamples < 20) continue;

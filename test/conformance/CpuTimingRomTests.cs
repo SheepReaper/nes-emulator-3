@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace SR.Emulation.Nes.ConformanceTests;
+namespace Sheep.Emulation.Nes.ConformanceTests;
 
 public sealed class CpuTimingRomTests
 {
@@ -20,7 +20,7 @@ public sealed class CpuTimingRomTests
         Assert.True(File.Exists(romPath), $"Missing test ROM: {romPath}");
         TestRomManifest.VerifyChecksum(definition, romPath);
 
-        var nes = new Nes(NesVideoStandard.Ntsc);
+        var nes = new NesSystem(NesVideoStandard.Ntsc);
         nes.LoadRom(File.ReadAllBytes(romPath));
 
         var terminal = LegacyRomTerminal.WaitForSelfJump(nes, MaximumPpuDots);

@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace SR.Emulation.Nes.ConformanceTests;
+namespace Sheep.Emulation.Nes.ConformanceTests;
 
 internal enum BlarggTestState
 {

@@ -1,0 +1,8 @@
+{
+  "xUnit": {
+    "diagnosticMessages": true,
+    "longRunningTestSeconds": 30,
+    "maxParallelThreads": "0.5x",
+    "parallelMode": "all"
+  }
+}
