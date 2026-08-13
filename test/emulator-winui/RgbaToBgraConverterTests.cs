@@ -1,4 +1,3 @@
-using EmuSheep;
 using Xunit;
 
 namespace EmuSheep.Tests;

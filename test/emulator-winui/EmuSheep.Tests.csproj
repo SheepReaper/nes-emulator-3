@@ -11,13 +11,24 @@
   <ItemGroup>
     <Compile Include="..\..\src\emulator-winui\RgbaToBgraConverter.cs" Link="RgbaToBgraConverter.cs" />
     <Compile Include="..\..\src\emulator-winui\NesEmulationSession.cs" Link="NesEmulationSession.cs" />
+    <Compile Include="..\..\src\emulator-winui\NesSessionAudioState.cs" Link="NesSessionAudioState.cs" />
+    <Compile Include="..\..\src\emulator-winui\NesAudioDemandCoordinator.cs" Link="NesAudioDemandCoordinator.cs" />
+    <Compile Include="..\..\src\emulator-winui\NesSessionRunner.cs" Link="NesSessionRunner.cs" />
+    <Compile Include="..\..\src\emulator-winui\NesSessionFrameBuffer.cs" Link="NesSessionFrameBuffer.cs" />
+    <Compile Include="..\..\src\emulator-winui\NesSessionRunContext.cs" Link="NesSessionRunContext.cs" />
+    <Compile Include="..\..\src\emulator-winui\NesEmulationLoop.cs" Link="NesEmulationLoop.cs" />
+    <Compile Include="..\..\src\emulator-winui\NesEmulationTimingHelper.cs" Link="NesEmulationTimingHelper.cs" />
+    <Compile Include="..\..\src\emulator-winui\EmulationSessionEvents.cs" Link="EmulationSessionEvents.cs" />
     <Compile Include="..\..\src\emulator-winui\StartupRomOptions.cs" Link="StartupRomOptions.cs" />
     <Compile Include="..\..\src\emulator-winui\InitialWindowLayout.cs" Link="InitialWindowLayout.cs" />
     <Compile Include="..\..\src\emulator-winui\KeyboardControllerState.cs" Link="KeyboardControllerState.cs" />
+    <Compile Include="..\..\src\emulator-winui\EmulationClockPacer.cs" Link="EmulationClockPacer.cs" />
+    <Compile Include="..\..\src\emulator-winui\ActualFrameRateCounter.cs" Link="ActualFrameRateCounter.cs" />
+    <Compile Include="..\..\src\emulator-winui\WinUiHostDiagnosticsBuilder.cs" Link="WinUiHostDiagnosticsBuilder.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\lib\emulation\SR.Emulation.Nes.csproj" />
+    <ProjectReference Include="..\..\src\lib\emulation\Sheep.Emulation.Nes.csproj" />
   </ItemGroup>
 
   <ItemGroup>

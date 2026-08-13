@@ -1,196 +1,78 @@
-using System.Diagnostics;
-using SR.Emulation.Nes;
+using Sheep.Emulation.Nes;
 
 namespace EmuSheep;
 
 internal sealed class NesEmulationSession : IAsyncDisposable
 {
-    private const double NtscFramesPerSecond = 60.0988;
-    private const double MaximumRecoverableLagInFrames = 4;
-
-    private readonly Nes _nes;
-    private readonly byte[] _latestFrame = new byte[Nes.FrameBufferSize];
-    private readonly object _frameGate = new();
-    private readonly object _stateGate = new();
+    private readonly NesSystem _nes;
+    private readonly NesSessionAudioState _audio;
+    private readonly NesAudioDemandCoordinator _audioDemand = new();
+    private readonly NesSessionRunner _runner = new();
+    private readonly NesSessionFrameBuffer _frames = new();
     private readonly CancellationTokenSource _cancellation = new();
 
-    private Task? _runTask;
-    private NesAudioPlayer? _audioPlayer;
-    private ulong _latestFrameNumber;
-    private bool _hasFrame;
-    private bool _disposed;
+    private double _speedMultiplier = 1;
 
     public NesEmulationSession(byte[] romData)
     {
         ArgumentNullException.ThrowIfNull(romData);
-        _nes = new Nes(NesVideoStandard.Ntsc);
+        _nes = new NesSystem(NesVideoStandard.Ntsc);
         _nes.LoadRom(romData);
+        _audio = new NesSessionAudioState(_nes);
     }
 
     public event EventHandler? FrameAvailable;
+    public event EventHandler<FrameRateAvailableEventArgs>? FrameRateAvailable;
     public event EventHandler<EmulationFaultedEventArgs>? Faulted;
     public event EventHandler<EmulationFaultedEventArgs>? AudioUnavailable;
 
-    public bool HasAudio => _audioPlayer != null;
+    public bool HasAudio => _audio.HasAudio;
+    public bool IsRunning => _runner.IsRunning;
 
-    public async Task InitializeAudioAsync()
-    {
-        try
-        {
-            _audioPlayer = await NesAudioPlayer.CreateAsync(_nes);
-        }
-        catch (Exception exception)
-        {
-            _audioPlayer = null;
-            AudioUnavailable?.Invoke(this, new EmulationFaultedEventArgs(exception));
-        }
-    }
+    public Task InitializeAudioAsync() => _audio.InitializeAsync(
+        _audioDemand.SignalDemand,
+        ex => AudioUnavailable?.Invoke(this, new EmulationFaultedEventArgs(ex)));
 
-    public void SetMuted(bool muted) { if (_audioPlayer != null) _audioPlayer.IsMuted = muted; }
-    public void SetVolume(double volume) => _audioPlayer?.SetVolume(volume);
+    public void SetMuted(bool muted) => _audio.SetMuted(muted);
+    public void SetVolume(double volume) => _audio.SetVolume(volume);
     public void SetFilterMode(NesAudioFilterMode mode) => _nes.AudioFilterMode = mode;
+    public void SetControllerState(NesControllerButton buttons) => _nes.SetControllerState(0, buttons);
 
-    public bool IsRunning
+    public void SetSpeedMultiplier(double speedMultiplier)
     {
-        get
+        if (!double.IsFinite(speedMultiplier) || speedMultiplier <= 0)
         {
-            lock (_stateGate)
-            {
-                return _runTask is { IsCompleted: false };
-            }
+            throw new ArgumentOutOfRangeException(nameof(speedMultiplier), "The speed multiplier must be positive and finite.");
         }
+        Volatile.Write(ref _speedMultiplier, speedMultiplier);
     }
 
     public void Start()
     {
-        lock (_stateGate)
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            if (_runTask != null)
-            {
-                throw new InvalidOperationException("The emulation session has already been started.");
-            }
+        var context = new NesSessionRunContext(
+            _audio.GetPlayer,
+            () => Volatile.Read(ref _speedMultiplier),
+            _audioDemand.WaitForDemandAsync,
+            _frames.PublishFrame,
+            () => FrameAvailable?.Invoke(this, EventArgs.Empty),
+            fps => FrameRateAvailable?.Invoke(this, new FrameRateAvailableEventArgs(fps)),
+            ex => Faulted?.Invoke(this, new EmulationFaultedEventArgs(ex)));
 
-            _runTask = Task.Run(() => RunAsync(_cancellation.Token));
-        }
+        _runner.Start(ct => NesEmulationLoop.RunAsync(_nes, context, ct), _cancellation.Token);
     }
 
-    public bool TryCopyLatestFrame(Span<byte> destination, out ulong frameNumber)
-    {
-        if (destination.Length < Nes.FrameBufferSize)
-        {
-            throw new ArgumentException($"The destination must contain at least {Nes.FrameBufferSize} bytes.", nameof(destination));
-        }
+    public bool TryCopyLatestFrame(Span<byte> destination, out ulong frameNumber) =>
+        _frames.TryCopyLatestFrame(destination, out frameNumber);
 
-        lock (_frameGate)
-        {
-            if (!_hasFrame)
-            {
-                frameNumber = 0;
-                return false;
-            }
-
-            _latestFrame.CopyTo(destination);
-            frameNumber = _latestFrameNumber;
-            return true;
-        }
-    }
-
-    public void SetControllerState(NesControllerButton buttons) =>
-        _nes.SetControllerState(0, buttons);
-
-    public async Task StopAsync()
-    {
-        Task? runTask;
-        lock (_stateGate)
-        {
-            _cancellation.Cancel();
-            runTask = _runTask;
-        }
-
-        if (runTask != null)
-        {
-            await runTask.ConfigureAwait(false);
-        }
-    }
+    public Task StopAsync() => _runner.StopAsync(_cancellation);
 
     public async ValueTask DisposeAsync()
     {
-        lock (_stateGate)
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            _disposed = true;
-        }
-
+        _runner.MarkDisposed();
         await StopAsync().ConfigureAwait(false);
-        if (_audioPlayer != null) await _audioPlayer.DisposeAsync().ConfigureAwait(false);
+        await _audio.DisposeAsync().ConfigureAwait(false);
+        _frames.Clear();
+        _audioDemand.Dispose();
         _cancellation.Dispose();
     }
-
-    private async Task RunAsync(CancellationToken cancellationToken)
-    {
-        var stopwatch = Stopwatch.StartNew();
-        var frameDurationTicks = Stopwatch.Frequency / NtscFramesPerSecond;
-        double nextFrameDeadline = stopwatch.ElapsedTicks;
-
-        try
-        {
-            while (true)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var result = _nes.RunUntilFrame();
-                if (result.Frames == 0)
-                {
-                    throw new InvalidOperationException($"Emulation stopped before completing a frame ({result.StopReason}).");
-                }
-
-                lock (_frameGate)
-                {
-                    _hasFrame = _nes.TryCopyFrame(_latestFrame, out _latestFrameNumber);
-                }
-
-                cancellationToken.ThrowIfCancellationRequested();
-                FrameAvailable?.Invoke(this, EventArgs.Empty);
-
-                if (_audioPlayer != null)
-                {
-                    // Keep roughly 30-50 ms queued. Device demand, rather than
-                    // video presentation, determines how quickly emulation runs.
-                    while (_nes.BufferedAudioSampleCount >= 2_400)
-                    {
-                        await Task.Delay(2, cancellationToken).ConfigureAwait(false);
-                    }
-                    continue;
-                }
-
-                nextFrameDeadline += frameDurationTicks;
-                var remainingTicks = nextFrameDeadline - stopwatch.ElapsedTicks;
-                if (remainingTicks > 0)
-                {
-                    var delay = TimeSpan.FromSeconds(remainingTicks / Stopwatch.Frequency);
-                    await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-                }
-                else if (-remainingTicks > frameDurationTicks * MaximumRecoverableLagInFrames)
-                {
-                    nextFrameDeadline = stopwatch.ElapsedTicks;
-                }
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
-        catch (Exception exception)
-        {
-            Faulted?.Invoke(this, new EmulationFaultedEventArgs(exception));
-        }
-    }
-}
-
-internal sealed class EmulationFaultedEventArgs(Exception exception) : EventArgs
-{
-    public Exception Exception { get; } = exception;
 }

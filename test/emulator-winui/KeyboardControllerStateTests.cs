@@ -1,5 +1,4 @@
 using Xunit;
-using SR.Emulation.Nes;
 
 namespace EmuSheep.Tests;
 

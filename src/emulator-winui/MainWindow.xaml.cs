@@ -1,30 +1,24 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
-using SR.Emulation.Nes;
+
 using Windows.Graphics;
+
+
 using VirtualKey = Windows.System.VirtualKey;
 
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
-
 namespace EmuSheep;
-
-/// <summary>
-/// The application window. This hosts a Frame that displays pages. Add your
-/// UI and logic to MainPage.xaml / MainPage.xaml.cs instead of here so you
-/// can use Page features such as navigation events and the Loaded lifecycle.
-/// </summary>
 public sealed partial class MainWindow : Window
 {
     private readonly KeyboardControllerState _keyboard = new();
+    private bool _controllerInputEnabled;
 
     public MainWindow(string? startupRomPath = null)
     {
         InitializeComponent();
 
-        RootLayout.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(RootLayout_KeyDown), true);
-        RootLayout.AddHandler(UIElement.KeyUpEvent, new KeyEventHandler(RootLayout_KeyUp), true);
+        RootLayout.AddHandler(UIElement.PreviewKeyDownEvent, new KeyEventHandler(RootLayout_KeyDown), true);
+        RootLayout.AddHandler(UIElement.PreviewKeyUpEvent, new KeyEventHandler(RootLayout_KeyUp), true);
         Activated += MainWindow_Activated;
 
         ExtendsContentIntoTitleBar = true;
@@ -33,18 +27,30 @@ public sealed partial class MainWindow : Window
         AppWindow.SetIcon("Assets/AppIcon.ico");
         SizeAndCenterForCurrentDisplay();
 
-        // Navigate the root frame to the main page on startup.
         RootFrame.Navigate(typeof(MainPage), startupRomPath);
     }
 
     internal event Action<NesControllerButton>? ControllerStateChanged;
     internal NesControllerButton ControllerButtons => _keyboard.Buttons;
+    internal bool ControllerInputEnabled
+    {
+        get => _controllerInputEnabled;
+        set
+        {
+            if (_controllerInputEnabled == value) return;
+            _controllerInputEnabled = value;
+            if (!value && _keyboard.Clear())
+                ControllerStateChanged?.Invoke(NesControllerButton.None);
+        }
+    }
 
     private void RootLayout_KeyDown(object sender, KeyRoutedEventArgs e) => UpdateControllerKey(e, true);
     private void RootLayout_KeyUp(object sender, KeyRoutedEventArgs e) => UpdateControllerKey(e, false);
 
     private void UpdateControllerKey(KeyRoutedEventArgs e, bool pressed)
     {
+        if (!ControllerInputEnabled) return;
+
         var key = e.Key switch
         {
             VirtualKey.Z => ControllerKey.A,

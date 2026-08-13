@@ -1,5 +1,3 @@
-using SR.Emulation.Nes;
-
 namespace EmuSheep;
 
 internal enum ControllerKey

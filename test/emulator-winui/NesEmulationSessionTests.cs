@@ -1,5 +1,5 @@
-using EmuSheep;
-using SR.Emulation.Nes;
+using Sheep.Emulation.Nes;
+
 using Xunit;
 
 namespace EmuSheep.Tests;
@@ -7,15 +7,25 @@ namespace EmuSheep.Tests;
 public sealed class NesEmulationSessionTests
 {
     [Fact]
+    public async Task SpeedMultiplierIsHostPacingPolicyAndMustBePositiveAndFinite()
+    {
+        await using var session = new NesEmulationSession(NesEmulationTestHelper.CreateMapperZeroRom());
+        session.SetSpeedMultiplier(2.5);
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.SetSpeedMultiplier(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.SetSpeedMultiplier(double.NaN));
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.SetSpeedMultiplier(double.PositiveInfinity));
+    }
+
+    [Fact]
     public async Task Start_PublishesCopyableFramesFromLoadedRom()
     {
-        await using var session = new NesEmulationSession(CreateMapperZeroRom());
+        await using var session = new NesEmulationSession(NesEmulationTestHelper.CreateMapperZeroRom());
         var frameAvailable = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         session.FrameAvailable += (_, _) => frameAvailable.TrySetResult();
 
         session.Start();
         await frameAvailable.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        byte[] frame = new byte[Nes.FrameBufferSize];
+        byte[] frame = new byte[NesSystem.FrameBufferSize];
 
         var copied = session.TryCopyLatestFrame(frame, out var frameNumber);
 
@@ -27,7 +37,7 @@ public sealed class NesEmulationSessionTests
     [Fact]
     public async Task StopAsync_StopsTheSessionAndIsIdempotent()
     {
-        await using var session = new NesEmulationSession(CreateMapperZeroRom());
+        await using var session = new NesEmulationSession(NesEmulationTestHelper.CreateMapperZeroRom());
         session.Start();
 
         await session.StopAsync();
@@ -39,7 +49,7 @@ public sealed class NesEmulationSessionTests
     [Fact]
     public async Task StopAsync_DoesNotPublishFramesAfterItReturns()
     {
-        await using var session = new NesEmulationSession(CreateMapperZeroRom());
+        await using var session = new NesEmulationSession(NesEmulationTestHelper.CreateMapperZeroRom());
         var firstFrame = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var frameCount = 0;
         session.FrameAvailable += (_, _) =>
@@ -60,31 +70,12 @@ public sealed class NesEmulationSessionTests
     [Fact]
     public async Task TryCopyLatestFrame_ReturnsFalseBeforeFirstFrame()
     {
-        await using var session = new NesEmulationSession(CreateMapperZeroRom());
-        byte[] frame = new byte[Nes.FrameBufferSize];
+        await using var session = new NesEmulationSession(NesEmulationTestHelper.CreateMapperZeroRom());
+        byte[] frame = new byte[NesSystem.FrameBufferSize];
 
         var copied = session.TryCopyLatestFrame(frame, out var frameNumber);
 
         Assert.False(copied);
         Assert.Equal(0UL, frameNumber);
-    }
-
-    private static byte[] CreateMapperZeroRom()
-    {
-        var rom = new byte[16 + 16 * 1024 + 8 * 1024];
-        rom[0] = (byte)'N';
-        rom[1] = (byte)'E';
-        rom[2] = (byte)'S';
-        rom[3] = 0x1A;
-        rom[4] = 1;
-        rom[5] = 1;
-        Array.Fill(rom, (byte)0xEA, 16, 16 * 1024);
-        rom[16 + 0x3FFA] = 0x00;
-        rom[16 + 0x3FFB] = 0x80;
-        rom[16 + 0x3FFC] = 0x00;
-        rom[16 + 0x3FFD] = 0x80;
-        rom[16 + 0x3FFE] = 0x00;
-        rom[16 + 0x3FFF] = 0x80;
-        return rom;
     }
 }

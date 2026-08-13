@@ -1,5 +1,7 @@
 namespace EmuSheep;
 
+using System.Runtime.InteropServices;
+
 public static class RgbaToBgraConverter
 {
     /// <summary>
@@ -14,17 +16,26 @@ public static class RgbaToBgraConverter
             throw new ArgumentException("Source and destination must contain the same number of complete RGBA pixels.");
         }
 
+        if (BitConverter.IsLittleEndian)
+        {
+            var sourcePixels = MemoryMarshal.Cast<byte, uint>(source);
+            var destinationPixels = MemoryMarshal.Cast<byte, uint>(destination);
+            for (var index = 0; index < sourcePixels.Length; index++)
+            {
+                var rgba = sourcePixels[index];
+                destinationPixels[index] = (rgba & 0xFF00FF00u) |
+                    ((rgba & 0x000000FFu) << 16) |
+                    ((rgba & 0x00FF0000u) >> 16);
+            }
+            return;
+        }
+
         for (var index = 0; index < source.Length; index += 4)
         {
-            var red = source[index];
-            var green = source[index + 1];
-            var blue = source[index + 2];
-            var alpha = source[index + 3];
-
-            destination[index] = blue;
-            destination[index + 1] = green;
-            destination[index + 2] = red;
-            destination[index + 3] = alpha;
+            destination[index] = source[index + 2];
+            destination[index + 1] = source[index + 1];
+            destination[index + 2] = source[index];
+            destination[index + 3] = source[index + 3];
         }
     }
 }

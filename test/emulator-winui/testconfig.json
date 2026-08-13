@@ -1,0 +1,7 @@
+{
+  "xUnit": {
+    "diagnosticMessages": true,
+    "longRunningTestSeconds": 10,
+    "parallelMode": "collections"
+  }
+}

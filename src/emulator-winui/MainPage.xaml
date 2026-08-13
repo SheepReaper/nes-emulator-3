@@ -104,13 +104,21 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock
-                    x:Name="StatusText"
-                    VerticalAlignment="Center"
-                    AutomationProperties.LiveSetting="Polite"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="No ROM loaded"
-                    TextTrimming="CharacterEllipsis" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock
+                        x:Name="StatusText"
+                        VerticalAlignment="Center"
+                        AutomationProperties.LiveSetting="Polite"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="No ROM loaded"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        x:Name="FrameRateText"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="Actual emulation frame rate"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="— FPS" />
+                </StackPanel>
                 <TextBlock
                     Grid.Column="1"
                     VerticalAlignment="Center"
@@ -131,7 +139,7 @@
                         Maximum="100"
                         Value="100"
                         ValueChanged="VolumeSlider_ValueChanged" />
-                    <ComboBox
+                     <ComboBox
                         x:Name="FilterSelector"
                         Width="100"
                         IsEnabled="False"
