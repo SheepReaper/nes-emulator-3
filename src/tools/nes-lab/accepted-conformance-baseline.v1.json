@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "expectedPassed": 239,
+  "expectedSkipped": 1,
+  "knownFailures": [
+    {
+      "id": "accuracycoin-explicit-dma-abort",
+      "nameContains": "Explicit DMA Abort",
+      "diagnosticContains": ["error=02"],
+      "evidenceUri": "nes-lab://artifact/context/sha256/57c3249f20d59ea7f96019d982897f6ebd1c69570e0f1e3fd62c57401935c611"
+    },
+    {
+      "id": "accuracycoin-implicit-dma-abort",
+      "nameContains": "Implicit DMA Abort",
+      "diagnosticContains": ["error=02"],
+      "evidenceUri": "nes-lab://artifact/context/sha256/f3a0da1f78ca9201e78f45c3c8d3a0551d56e9c872f5ca43add2b21dc008d91b"
+    },
+    {
+      "id": "accuracycoin-delta-modulation-channel",
+      "nameContains": "Delta Modulation Channel",
+      "diagnosticContains": ["error=15"],
+      "evidenceUri": "nes-lab://artifact/context/sha256/43152fdc7e74c132c3ad10a5714e841be75ecb69f60c376edf49242e25e0e624"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "name": "controller-dma-repeat",
+  "rom": { "manifestCase": "dma_4016_read", "suite": "dmc_dma_during_read4" },
+  "videoStandard": "Ntsc",
+  "stop": { "kind": "ppuDots", "value": 3000000 },
+  "controllerChanges": [
+    { "beforePpuDot": 0, "port": 0, "buttons": "A, Right" },
+    { "beforePpuDot": 1000000, "port": 0, "buttons": "None" }
+  ],
+  "capturePoints": [
+    { "id": "dma-window", "atPpuDot": 2000000, "snapshot": true, "trace": true }
+  ],
+  "maximumTraceRecords": 4096,
+  "maximumAudioSamples": 0
+}

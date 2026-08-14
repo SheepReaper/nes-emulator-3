@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "aliases": {
+    "curtain": ["scroll", "split screen", "nametable", "vram address", "background pipeline"],
+    "duplicated": ["mirroring", "nametable", "scroll"],
+    "split": ["scroll", "scanline", "nametable", "2005", "2006", "vram address"],
+    "scrolling": ["scroll", "vram address", "temporary vram", "fine x", "coarse"],
+    "v/t/x/w": ["vram address", "temporary vram", "fine x", "write toggle"],
+    "sprite priority": ["sprite", "priority", "pixel renderer", "sprite zero"],
+    "dma": ["dmc dma", "oam dma", "cpu dma", "bus conflict"],
+    "frame irq": ["apu frame irq", "frame counter", "interrupt"],
+    "controller": ["controller ports", "keyboard controller", "4016", "4017"],
+    "mapper": ["cartridge", "bank resolver", "irq tracker", "mirroring"]
+    ,"opcode": ["instruction", "decoder", "cycle", "timing"]
+    ,"checkpoint": ["trace", "capture", "harness"]
+    ,"polling": ["interrupt", "irq", "clock", "boundary"]
+    ,"halt retry": ["dma", "controller", "read cycle"]
+    ,"cli": ["cpu clock driver", "cpu interrupt handler", "irq pending", "instruction poll"]
+    ,"dmc dma": ["cpu dma controller", "accuracy coin harness", "apu dmc reader"]
+    ,"ines": ["cartridge factory", "rom header", "trainer", "nes 2.0"]
+    ,"namespace migration": ["roslyn", "project reference", "build diagnostic", "contracts"]
+    ,"debugger api": ["inesdebugger", "snapshot", "breakpoint", "public api"]
+    ,"gray frame": ["frame presenter", "rgba", "writeablebitmap", "winui video"]
+    ,"silent audio": ["audiograph", "audio frame", "underrun", "winui audio"]
+  },
+  "subsystems": {
+    "cpu": ["src/lib/emulation/Cpu", "test/cpu/Cpu"],
+    "ppu": ["src/lib/emulation/Video/Ppu", "test/cpu/Ppu"],
+    "apu": ["src/lib/emulation/Audio/Apu", "test/cpu/Apu", "test/cpu/Audio"],
+    "dma": ["CpuDma", "DmcDma", "DmaAndController", "AccuracyCoin"],
+    "mapper": ["Cartridges/Mappers", "test/cpu/Mapper", "MapperConformance"],
+    "cartridge": ["src/lib/emulation/Cartridges", "test/cpu/NromCart", "test/cpu/DiscreteMapper"],
+    "debugger": ["src/lib/emulation/Debugging", "test/cpu/Debugger"],
+    "winui": ["src/emulator-winui", "src/lib/interop-winui", "test/emulator-winui"],
+    "conformance": ["test/conformance"],
+    "lab": ["src/tools/nes-lab", "test/nes-lab"]
+  },
+  "routes": {
+    "cpu": ["opcode", "instruction", "cycles", "cycle", "timing", "irq", "interrupt", "polling"],
+    "ppu": ["curtain", "scroll", "nametable", "background", "sprite", "mirroring"],
+    "apu": ["audio", "audiograph", "dmc", "frame", "irq", "samples"],
+    "dma": ["dma", "dmc", "oam", "collision", "controller"],
+    "mapper": ["mapper", "mmc", "mmc3", "bank", "cartridge"],
+    "cartridge": ["ines", "nes2", "header", "trainer", "chr ram", "cartridge"],
+    "debugger": ["debugger", "snapshot", "breakpoint", "disassembly", "public api"],
+    "winui": ["winui", "audiograph", "window", "keyboard"],
+    "conformance": ["accuracycoin", "conformance", "harness", "checkpoint", "rom"],
+    "lab": ["lab", "retrieval", "verification", "branch", "scope", "gateway", "namespace", "build error"]
+  },
+  "seeds": {
+    "official opcode": ["src/lib/emulation/Cpu/CpuInstructionDecoder.cs", "test/cpu/CpuCycleTimingTests.cs"],
+    "curtain": ["src/lib/emulation/Video/PpuScrollRegisters.cs", "src/lib/emulation/Video/PpuBackgroundPipelineDriver.cs"],
+    "halt retry": ["src/lib/emulation/Cpu/CpuDmaController.cs", "test/cpu/DmaAndControllerBusTests.cs"],
+    "collides with OAM DMA": ["src/lib/emulation/Cpu/CpuDmaController.cs", "test/conformance/AccuracyCoinHarness.cs"],
+    "polling boundary": ["src/lib/emulation/Cpu/CpuClockDriver.cs", "src/lib/emulation/Cpu/CpuInterruptHandler.cs"],
+    "terminal tail": ["test/conformance/AccuracyCoinHarness.cs", "test/conformance/ConformanceTraceCapture.cs"],
+    "MMC3 IRQ": ["src/lib/emulation/Cartridges/Mappers/Mmc3IrqTracker.cs", "test/cpu/Mapper4PpuAndIrqTests.cs"],
+    "MMC1 shift": ["src/lib/emulation/Cartridges/Mappers/Mmc1ShiftRegister.cs", "test/cpu/Mapper1AdvancedTests.cs"],
+    "iNES trainer": ["src/lib/emulation/Cartridges/CartridgeFactory.cs", "test/cpu/NromCartTests.cs"],
+    "gray frame": ["src/emulator-winui/MainPageFramePresenter.cs", "test/emulator-winui/NesEmulationSessionTests.cs"],
+    "silent audio": ["src/emulator-winui/NesAudioGraphFactory.cs", "test/emulator-winui/NesEmulationSessionAudioTests.cs"],
+    "AudioGraph device": ["src/emulator-winui/NesAudioGraphFactory.cs", "test/emulator-winui/NesEmulationSessionAudioTests.cs"],
+    "debugger API": ["src/lib/emulation/Debugging/INesDebugger.cs", "test/cpu/DebuggerTests.cs"],
+    "namespace migration": ["src/tools/nes-lab/BuildDiagnosticParser.cs", "test/nes-lab/BuildDiagnosticParserTests.cs"]
+    ,"original goal": ["tasks/local-agent-offload-plan.md", "tasks/local-agent-offload-todo.md", "src/tools/nes-lab/gateway-corpus.v3.json", "test/nes-lab/GatewayBenchmarkTests.cs"]
+  }
+}

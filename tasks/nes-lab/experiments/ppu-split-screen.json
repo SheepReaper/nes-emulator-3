@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "name": "ppu-split-screen",
+  "rom": { "path": "test-roms/nes-test-roms/scrolltest/scroll.nes" },
+  "videoStandard": "Ntsc",
+  "stop": { "kind": "frames", "value": 3 },
+  "controllerChanges": [],
+  "capturePoints": [
+    { "id": "frame-one", "atPpuDot": 90000, "snapshot": true, "frame": true, "trace": true },
+    { "id": "frame-two", "atPpuDot": 180000, "snapshot": true, "frame": true, "trace": true }
+  ],
+  "maximumTraceRecords": 4096,
+  "maximumAudioSamples": 0
+}

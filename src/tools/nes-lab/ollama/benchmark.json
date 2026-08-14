@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "name": "classification",
+      "maximumResults": 1,
+      "expectedSelectedIds": ["fact-status"],
+      "requiredSummaryTerms": ["NESdev APU Status"],
+      "candidates": [
+        {"id":"observation","kind":"observation","content":"The ROM waits at its result screen.","source":"run-17.json","priority":40},
+        {"id":"fact-status","kind":"confirmedFact","content":"Reading $4015 clears the frame interrupt flag after reporting it.","source":"NESdev APU Status","priority":100},
+        {"id":"rejected","kind":"rejectedHypothesis","content":"Controller reads clear the frame interrupt.","source":"investigation-4","priority":0}
+      ]
+    },
+    {
+      "name": "ranking",
+      "maximumResults": 2,
+      "expectedSelectedIds": ["trace-first","fact-dma"],
+      "requiredSummaryTerms": ["trace-dma.json", "NESdev DMA"],
+      "candidates": [
+        {"id":"fact-dma","kind":"confirmedFact","content":"DMC DMA has priority during OAM DMA.","source":"NESdev DMA","priority":100},
+        {"id":"trace-first","kind":"traceWindow","content":"The first divergence occurs at CPU clock 657788 during DMC/OAM overlap.","source":"trace-dma.json","priority":95},
+        {"id":"guess-ppu","kind":"hypothesis","content":"The PPU may be rendering too slowly.","source":"note.md","priority":10}
+      ]
+    },
+    {
+      "name": "deduplication",
+      "maximumResults": 1,
+      "expectedSelectedIds": ["fact-a"],
+      "requiredSummaryTerms": ["NESdev DMA"],
+      "candidates": [
+        {"id":"fact-a","kind":"confirmedFact","content":"DMC DMA has priority during OAM DMA.","source":"NESdev DMA","priority":100},
+        {"id":"fact-b","kind":"observation","content":"DMC DMA has priority during OAM DMA.","source":"copied-note.md","priority":30}
+      ]
+    },
+    {
+      "name": "summarization",
+      "maximumResults": 2,
+      "expectedSelectedIds": ["trace-4015","fact-4015"],
+      "requiredSummaryTerms": ["trace-4015.json", "NESdev APU Status", "$4015"],
+      "candidates": [
+        {"id":"trace-4015","kind":"traceWindow","content":"A repeated $4015 read occurs during DMA and the first result divergence follows.","source":"trace-4015.json","priority":100},
+        {"id":"fact-4015","kind":"confirmedFact","content":"$4015 reads report channel and IRQ status and clear the frame IRQ flag.","source":"NESdev APU Status","priority":95},
+        {"id":"unrelated","kind":"observation","content":"The background palette is black.","source":"frame.png","priority":5}
+      ]
+    },
+    {
+      "name": "cpu-cycle-timing",
+      "maximumResults": 2,
+      "expectedSelectedIds": ["cpu-trace", "cpu-test"],
+      "requiredSummaryTerms": ["CpuClockDriver", "CpuTests"],
+      "candidates": [
+        {"id":"cpu-trace","kind":"traceWindow","content":"The assertion boundary shows an extra CPU cycle after an indexed read.","source":"CpuClockDriver trace","priority":100},
+        {"id":"cpu-test","kind":"affectedTest","content":"The focused page-crossing cycle test expects one conditional cycle.","source":"CpuTests","priority":95},
+        {"id":"cpu-ui","kind":"observation","content":"The window was resized.","source":"MainWindow","priority":1}
+      ]
+    },
+    {
+      "name": "ppu-mapper",
+      "maximumResults": 2,
+      "expectedSelectedIds": ["ppu-fetch", "mapper-rule"],
+      "requiredSummaryTerms": ["PPU fetch", "MMC3"],
+      "candidates": [
+        {"id":"ppu-fetch","kind":"traceWindow","content":"PPU fetch address A12 rises at the failing scanline checkpoint.","source":"PPU fetch trace","priority":100},
+        {"id":"mapper-rule","kind":"confirmedFact","content":"MMC3 clocks its IRQ counter on filtered PPU A12 rising edges.","source":"MMC3 reference","priority":95},
+        {"id":"palette","kind":"observation","content":"The palette uses emphasis bits.","source":"frame","priority":5}
+      ]
+    },
+    {
+      "name": "apu-dmc",
+      "maximumResults": 2,
+      "expectedSelectedIds": ["dmc-checkpoint", "dmc-source"],
+      "requiredSummaryTerms": ["DMC DMA", "AccuracyCoin"],
+      "candidates": [
+        {"id":"dmc-checkpoint","kind":"traceWindow","content":"The first DMC DMA request checkpoint precedes the encoded result write.","source":"DMC DMA trace","priority":100},
+        {"id":"dmc-source","kind":"romSource","content":"AccuracyCoin compares the DMC status sequence with its answer table.","source":"AccuracyCoin routine","priority":95},
+        {"id":"audio-device","kind":"observation","content":"AudioGraph selected the default endpoint.","source":"WinUI","priority":5}
+      ]
+    },
+    {
+      "name": "winui-adapter",
+      "maximumResults": 2,
+      "expectedSelectedIds": ["interop-test", "adapter-body"],
+      "requiredSummaryTerms": ["AudioFrame", "WinUI"],
+      "candidates": [
+        {"id":"interop-test","kind":"affectedTest","content":"AudioFrame conversion preserves sample count and channel duplication.","source":"AudioFrame tests","priority":100},
+        {"id":"adapter-body","kind":"declaration","content":"The WinUI adapter fills the requested AudioFrame quantum without running emulation.","source":"WinUI adapter","priority":95},
+        {"id":"cpu-opcode","kind":"confirmedFact","content":"NOP takes two cycles.","source":"CPU","priority":5}
+      ]
+    },
+    {
+      "name": "harness-protocol",
+      "maximumResults": 2,
+      "expectedSelectedIds": ["protocol", "routine"],
+      "requiredSummaryTerms": ["encoded", "test routine"],
+      "candidates": [
+        {"id":"protocol","kind":"confirmedFact","content":"AccuracyCoin result bytes encode ErrorCode shifted left two bits plus status flags.","source":"encoded protocol","priority":100},
+        {"id":"routine","kind":"romSource","content":"The menu entry resolves to the actual test routine and result symbol.","source":"test routine","priority":95},
+        {"id":"terminal","kind":"traceWindow","content":"The terminal menu loop runs much later.","source":"tail","priority":10}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "version": 2,
+  "tasks": [
+    {
+      "name": "cpu-timing", "task": "an official opcode consumes the wrong number of CPU cycles",
+      "requiredPaths": ["CpuInstructionDecoder.cs", "CpuCycleTimingTests.cs"],
+      "requiredEvidence": [
+        { "path": "CpuInstructionDecoder.cs", "symbolId": "CpuInstructionDecoder", "markers": ["CpuInstructionDecoder"] },
+        { "path": "CpuCycleTimingTests.cs", "symbolId": "CpuCycleTimingTests", "markers": ["CpuCycleTimingTests"] }
+      ],
+      "relevantPaths": ["Cpu.cs", "CpuClockDriver.cs"], "distractorPaths": ["PpuPixelRenderer.cs"],
+      "referenceTopics": ["cpu-cycle-timing"], "verification": "verify --scope cpu"
+    },
+    {
+      "name": "ppu-curtain-split", "task": "the curtain reveals a duplicated nametable below the split instead of a black background",
+      "requiredPaths": ["PpuScrollRegisters.cs", "PpuBackgroundPipelineDriver.cs"],
+      "requiredEvidence": [
+        { "path": "PpuScrollRegisters.cs", "symbolId": "PpuScrollRegisters", "markers": ["PpuScrollRegisters"] },
+        { "path": "PpuBackgroundPipelineDriver.cs", "symbolId": "PpuBackgroundPipelineDriver", "markers": ["PpuBackgroundPipelineDriver"] }
+      ],
+      "relevantPaths": ["PpuBusAddressMapper.cs", "PpuRenderingAndSpriteTests.cs"], "distractorPaths": ["ApuPulse.cs"],
+      "referenceTopics": ["ppu-scroll", "split-screen"], "verification": "verify --scope cpu"
+    },
+    {
+      "name": "dma-controller-repeat", "task": "a DMC DMA halt retry repeats a controller read and shifts 4016 twice",
+      "requiredPaths": ["CpuDmaController.cs", "DmaAndControllerBusTests.cs"],
+      "requiredEvidence": [
+        { "path": "CpuDmaController.cs", "symbolId": "CpuDmaController", "markers": ["CpuDmaController"] },
+        { "path": "DmaAndControllerBusTests.cs", "symbolId": "DmaAndControllerBusTests", "markers": ["Controller"] }
+      ],
+      "relevantPaths": ["CpuControllerPorts.cs", "ApuDmcReader.cs"], "distractorPaths": ["Mmc1BankResolver.cs"],
+      "referenceTopics": ["dma", "controller-side-effects"], "verification": "experiment run --scenario controller-dma-repeat"
+    },
+    {
+      "name": "dma-apu", "task": "AccuracyCoin DMC DMA collides with OAM DMA at the wrong APU get put phase",
+      "requiredPaths": ["CpuDmaController.cs", "AccuracyCoinHarness.cs"],
+      "requiredEvidence": [
+        { "path": "CpuDmaController.cs", "symbolId": "CpuDmaController", "markers": ["CpuDmaController"] },
+        { "path": "AccuracyCoinHarness.cs", "symbolId": "AccuracyCoinHarness", "markers": ["AccuracyCoinHarness"] }
+      ],
+      "relevantPaths": ["ApuDmcReader.cs", "ConformanceTraceCapture.cs"], "distractorPaths": ["Mmc3BankResolver.cs"],
+      "referenceTopics": ["dma", "apu-get-put"], "verification": "verify --scope conformance"
+    },
+    {
+      "name": "interrupt-polling", "task": "IRQ asserted around CLI is sampled at the wrong instruction polling boundary",
+      "requiredPaths": ["CpuClockDriver.cs", "CpuInterruptHandler.cs"],
+      "requiredEvidence": [
+        { "path": "CpuClockDriver.cs", "symbolId": "CpuClockDriver", "markers": ["CpuClockDriver"] },
+        { "path": "CpuInterruptHandler.cs", "symbolId": "CpuInterruptHandler", "markers": ["CpuInterruptHandler"] }
+      ],
+      "relevantPaths": ["InterruptLines.cs", "CpuInterruptTests.cs"], "distractorPaths": ["PpuPaletteResolver.cs"],
+      "referenceTopics": ["cpu-interrupts"], "verification": "verify --scope cpu"
+    },
+    {
+      "name": "conformance-harness", "task": "AccuracyCoin result decoding selects a terminal tail instead of the DMC checkpoint",
+      "requiredPaths": ["AccuracyCoinHarness.cs", "ConformanceTraceCapture.cs"],
+      "requiredEvidence": [
+        { "path": "AccuracyCoinHarness.cs", "symbolId": "AccuracyCoinHarness", "markers": ["AccuracyCoinHarness"] },
+        { "path": "ConformanceTraceCapture.cs", "symbolId": "ConformanceTraceCapture", "markers": ["MarkCheckpoint"] }
+      ],
+      "relevantPaths": ["AccuracyCoinSourceResolver.cs", "DiagnosisService.cs"], "distractorPaths": ["MainWindow.xaml.cs"],
+      "referenceTopics": ["accuracycoin", "dma"], "verification": "verify --scope conformance"
+    }
+  ]
+}

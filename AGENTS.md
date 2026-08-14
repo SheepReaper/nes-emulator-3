@@ -1,34 +1,82 @@
 # NES Emulator Agent Guidance
 
-Use the hardware-validated ROMs in `test/conformance` as integration tests, but read the corresponding source under `test-roms/nes-test-roms` before interpreting a terse failure label. Locate the byte or instruction that distinguishes the two sides of a timing boundary and inspect it directly when needed. Do not infer direction solely from names such as “sooner” or “later.”
+Read the nearest nested `AGENTS.md` before changing a subsystem. Detailed timing, conformance-ROM, and WinUI interop rules are scoped to their relevant directories.
 
-Run the main verification surfaces with:
+This repository runs on Windows PowerShell. Use `rg` for repository search; do not use `grep`.
+Prefer PowerShell-native commands for filesystem and process operations, and use `Select-String`
+for targeted fallback checks only when `rg` is unavailable.
+Python is not required for normal emulator or NES Lab work. Do not launch Python unless the task
+explicitly requires a Python script; when it does, use `py -3.14` rather than bare `python`.
+Avoid interactive commands and REPLs; use bounded, non-interactive commands so the agent does not
+wait indefinitely for manual input.
+
+## Primary evidence gateway
+
+Use `nes-lab` as the repository's primary verification and evidence gateway for all emulator and tooling work. Follow this workflow in order:
+
+1. Run only the two commands below; do not read additional source files or run additional commands until their output is reviewed.
 
 ```powershell
-dotnet test test/cpu/SR.Emulation.Nes.Tests.csproj --no-restore --output Normal
-dotnet test test/conformance/SR.Emulation.Nes.ConformanceTests.csproj --no-restore --output Normal
+dotnet run --project src/tools/nes-lab/Sheep.Nes.Lab.csproj --no-restore -- context build --task "<issue or change>" --budget 16000
+dotnet run --project src/tools/nes-lab/Sheep.Nes.Lab.csproj --no-restore -- verify --changed
+```
+
+2. If `verify --changed` reports failures, inspect them with `diagnose --run latest` or a named `diagnose --case` command before running any test project directly.
+3. Only if the gateway output does not resolve the issue, run the specific `dotnet test`/`dotnet build` project for the affected subsystem from the reference commands below. Do not run the full block of reference commands unless every subsystem is in scope.
+
+These `dotnet run` commands are source-mode CLI commands and always include `--no-restore`. MCP clients use the published Release
+gateway at `.artifacts/nes-lab/gateway/Sheep.Nes.Lab.dll`. After cloning or changing NES Lab
+source, run `.\tools\Restore-NesLab.ps1` to rebuild the ignored gateway output and refresh its
+manifest. If `.\tools\Restore-NesLab.ps1` exits with a non-zero code, stop and report the script output to the user before proceeding with any `nes-lab` commands.
+When an active MCP host locks the published assembly, rerun it with `-Force` (or `--force`). The
+force flow terminates only the process launched with this checkout's published gateway DLL,
+republishes it, and validates the replacement through a fresh MCP handshake.
+
+Use the typed MCP server, repository-local `.agents/mcp_config.json`, and published gateway under `.artifacts/nes-lab/gateway` for agent integrations. Do not expose generic shell or filesystem access as a substitute for typed `nes-lab` operations.
+
+Verification does not accept a context budget. Use `verify --scope ...` (or `verify --changed`)
+for execution, and use `diagnose --budget <bytes>` or `context build --budget <bytes>` to limit
+agent-facing evidence. If `diagnose --budget` is rejected, refresh the published gateway with
+`.\tools\Restore-NesLab.ps1` and verify that the command is running from this checkout.
+
+### Reference: full verification surfaces
+
+Use these only per step 3 above, scoped to the affected project(s); do not run the whole block as a first step:
+
+```powershell
+dotnet test test/nes-lab/Sheep.Nes.Lab.Tests.csproj --no-restore --output Normal
+dotnet test test/cpu/Sheep.Emulation.Nes.Tests.csproj --no-restore --output Normal
+dotnet test test/conformance/Sheep.Emulation.Nes.ConformanceTests.csproj --no-restore --output Normal
 dotnet test test/emulator-winui/EmuSheep.Tests.csproj --no-restore --output Normal
-dotnet build src/lib/emulation/SR.Emulation.Nes.csproj --no-restore
+dotnet build src/lib/emulation/Sheep.Emulation.Nes.csproj --no-restore
+dotnet build src/lib/interop-winui/Sheep.WinUI.Interop.csproj --no-restore
+dotnet build src/emulator-winui/EmuSheep.csproj --no-restore
 git diff --check
 ```
 
-The successful paths for `ppu_vbl_nmi/10-even_odd_timing` and `mmc3_test_2/4-scanline_timing` need substantially more than ten million PPU dots. Do not reduce their manifest ceilings based on an earlier failing path.
+## Test filtering
 
-## Shared timing model
+This repository uses Microsoft.Testing.Platform through `global.json`. Do not use the usual
+VSTest filter form (`--filter "FullyQualifiedName~..."`) with these test projects; it can
+select zero tests and return an MTP non-success exit code. Use the native MTP filters instead:
 
-- `Nes` owns the shared clock. NTSC uses three PPU dots per CPU clock; mapper M2 filtering must receive the same CPU-clock cadence rather than deriving it from elapsed PPU dots.
-- CPU-visible absolute I/O reads and writes occur on the instruction's final cycle. Memory read-modify-write results used as timing discriminators must likewise become visible on their final write cycle.
-- NMI is edge-sensitive. Capture a PPU NMI edge even if the line rises and falls between CPU clocks, but reject a pulse shortened by the pre-render clear before it reaches the CPU latch.
-- An NMI first observed at an opcode boundary has missed the preceding poll and waits through the next instruction.
-- IRQ is level-sensitive but is polled on the instruction's penultimate cycle. Service only the latched poll result at the next boundary. In this functional CPU, `_cycles == 2` is that polling point, including the opcode-fetch cycle of a two-cycle instruction.
+```powershell
+dotnet test <project> -- --filter-class "*TestClass*"
+dotnet test <project> -- --filter-method "*TestClass.TestMethod*"
+dotnet test <project> -- --filter-display-name "*case name*"
+```
 
-## PPU and mapper bus phases
+When translating an agent-generated `FullyQualifiedName~ClassName` filter, use
+`-- --filter-class "*ClassName*"`. `nes-lab` already emits MTP-native filters for named cases.
+Keep VSTest-only options such as `--logger "console;verbosity=minimal"` out of the forwarded
+arguments; use the default console output or MTP-native reporting options instead.
 
-- NTSC odd frames omit dot 340 by jumping after pre-render dot 339. Rendering eligibility for this skip is sampled one dot earlier, at dot 338; a later PPUMASK change must not retroactively change the decision.
-- A PPU fetch presents its address before the data read. Mapper-visible A12 transitions belong to the address-presentation dot, while renderer latches may still load data on the following phase.
-- For 8x8 sprites with sprites at `$1000`, the MMC3-qualified A12 transition is associated with sprite fetch dot 260 in this model.
-- With backgrounds at `$1000`, present the background pattern address at dot 324 of the preceding scanline. Do not clock MMC3 only when the pattern byte is consumed.
-- MMC3 A12 filtering is governed by falling CPU M2 edges, not a fixed eight-PPU-dot duration. `Mmc3Cart` counts completed low M2 samples; its internal threshold includes the transition interval, so direct mapper tests use four clock notifications to represent three complete low samples.
-- Debugger peeks and framebuffer palette lookup must not create mapper-visible PPU address transitions.
+For NES timing, conformance, and emulator-diagnosis work, follow the same primary evidence gateway workflow above instead of broad repository reads:
 
-When changing any one of these phases, add a focused unit test for the exact boundary and run the complete conformance suite. Remove temporary console tracing and diagnostic assertion fields before handing off.
+```powershell
+dotnet run --project src/tools/nes-lab/Sheep.Nes.Lab.csproj --no-restore -- context build --task "<issue or symptom>" --budget 16000
+dotnet run --project src/tools/nes-lab/Sheep.Nes.Lab.csproj --no-restore -- verify --scope cpu
+dotnet run --project src/tools/nes-lab/Sheep.Nes.Lab.csproj --no-restore -- diagnose --run latest --budget 16000
+```
+
+Use the focused packet and reduced verification output before escalating to broader suite or code reads. Preserve unrelated user changes in a dirty worktree. Add a focused test for changed behavior and remove temporary tracing before handing off.

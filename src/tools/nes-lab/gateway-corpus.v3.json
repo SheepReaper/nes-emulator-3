@@ -1,0 +1,135 @@
+{
+  "version": 3,
+  "tasks": [
+    {
+      "name": "cpu-timing", "task": "an official opcode consumes the wrong number of CPU cycles",
+      "requiredPaths": ["CpuInstructionDecoder.cs", "CpuCycleTimingTests.cs"],
+      "requiredEvidence": [
+        { "path": "CpuInstructionDecoder.cs", "symbolId": "CpuInstructionDecoder", "markers": ["CpuInstructionDecoder"] },
+        { "path": "CpuCycleTimingTests.cs", "symbolId": "CpuCycleTimingTests", "markers": ["CpuCycleTimingTests"] }
+      ],
+      "relevantPaths": ["Cpu.cs", "CpuClockDriver.cs"], "distractorPaths": ["PpuPixelRenderer.cs"],
+      "referenceTopics": ["cpu-cycle-timing"], "verification": "verify --scope cpu"
+    },
+    {
+      "name": "ppu-curtain-split", "task": "the curtain reveals a duplicated nametable below the split instead of a black background",
+      "requiredPaths": ["PpuScrollRegisters.cs", "PpuBackgroundPipelineDriver.cs"],
+      "requiredEvidence": [
+        { "path": "PpuScrollRegisters.cs", "symbolId": "PpuScrollRegisters", "markers": ["PpuScrollRegisters"] },
+        { "path": "PpuBackgroundPipelineDriver.cs", "symbolId": "PpuBackgroundPipelineDriver", "markers": ["PpuBackgroundPipelineDriver"] }
+      ],
+      "relevantPaths": ["PpuBusAddressMapper.cs", "PpuRenderingAndSpriteTests.cs"], "distractorPaths": ["ApuPulse.cs"],
+      "referenceTopics": ["ppu-scroll", "split-screen"], "verification": "verify --scope ppu"
+    },
+    {
+      "name": "dma-controller-repeat", "task": "a DMC DMA halt retry repeats a controller read and shifts 4016 twice",
+      "requiredPaths": ["CpuDmaController.cs", "DmaAndControllerBusTests.cs"],
+      "requiredEvidence": [
+        { "path": "CpuDmaController.cs", "symbolId": "CpuDmaController", "markers": ["CpuDmaController"] },
+        { "path": "DmaAndControllerBusTests.cs", "symbolId": "DmaAndControllerBusTests", "markers": ["Controller"] }
+      ],
+      "relevantPaths": ["CpuControllerPorts.cs", "ApuDmcReader.cs"], "distractorPaths": ["Mmc1BankResolver.cs"],
+      "referenceTopics": ["dma", "controller-side-effects"], "verification": "verify --scope dma"
+    },
+    {
+      "name": "dma-apu", "task": "AccuracyCoin DMC DMA collides with OAM DMA at the wrong APU get put phase",
+      "requiredPaths": ["CpuDmaController.cs", "AccuracyCoinHarness.cs"],
+      "requiredEvidence": [
+        { "path": "CpuDmaController.cs", "symbolId": "CpuDmaController", "markers": ["CpuDmaController"] },
+        { "path": "AccuracyCoinHarness.cs", "symbolId": "AccuracyCoinHarness", "markers": ["AccuracyCoinHarness"] }
+      ],
+      "relevantPaths": ["ApuDmcReader.cs", "ConformanceTraceCapture.cs"], "distractorPaths": ["Mmc3BankResolver.cs"],
+      "referenceTopics": ["dma", "apu-get-put"], "verification": "verify --scope conformance"
+    },
+    {
+      "name": "interrupt-polling", "task": "IRQ asserted around CLI is sampled at the wrong instruction polling boundary",
+      "requiredPaths": ["CpuClockDriver.cs", "CpuInterruptHandler.cs"],
+      "requiredEvidence": [
+        { "path": "CpuClockDriver.cs", "symbolId": "CpuClockDriver", "markers": ["CpuClockDriver"] },
+        { "path": "CpuInterruptHandler.cs", "symbolId": "CpuInterruptHandler", "markers": ["CpuInterruptHandler"] }
+      ],
+      "relevantPaths": ["InterruptLines.cs", "CpuInterruptTests.cs"], "distractorPaths": ["PpuPaletteResolver.cs"],
+      "referenceTopics": ["cpu-interrupts"], "verification": "verify --scope cpu"
+    },
+    {
+      "name": "conformance-harness", "task": "AccuracyCoin result decoding selects a terminal tail instead of the DMC checkpoint",
+      "requiredPaths": ["AccuracyCoinHarness.cs", "ConformanceTraceCapture.cs"],
+      "requiredEvidence": [
+        { "path": "AccuracyCoinHarness.cs", "symbolId": "AccuracyCoinHarness", "markers": ["AccuracyCoinHarness"] },
+        { "path": "ConformanceTraceCapture.cs", "symbolId": "ConformanceTraceCapture", "markers": ["MarkCheckpoint"] }
+      ],
+      "relevantPaths": ["AccuracyCoinSourceResolver.cs", "DiagnosisService.cs"], "distractorPaths": ["MainWindow.xaml.cs"],
+      "referenceTopics": ["accuracycoin", "dma"], "verification": "verify --scope conformance"
+    },
+    {
+      "name": "mapper-mmc3", "task": "MMC3 IRQ fires one scanline early after A12 banking changes",
+      "requiredPaths": ["Mmc3IrqTracker.cs", "Mapper4PpuAndIrqTests.cs"],
+      "requiredEvidence": [
+        { "path": "Mmc3IrqTracker.cs", "symbolId": "Mmc3IrqTracker", "markers": ["Mmc3IrqTracker"] },
+        { "path": "Mapper4PpuAndIrqTests.cs", "symbolId": "Mapper4PpuAndIrqTests", "markers": ["Mapper4"] }
+      ],
+      "relevantPaths": ["Mmc3BankResolver.cs", "Mmc3Cart.cs"], "distractorPaths": ["NesAudioGraphFactory.cs"],
+      "referenceTopics": ["mapper"], "verification": "verify --scope mapper"
+    },
+    {
+      "name": "mapper-mmc1", "task": "MMC1 shift register commits the bank before the fifth serial write",
+      "requiredPaths": ["Mmc1ShiftRegister.cs", "Mapper1AdvancedTests.cs"],
+      "requiredEvidence": [
+        { "path": "Mmc1ShiftRegister.cs", "symbolId": "Mmc1ShiftRegister", "markers": ["Mmc1ShiftRegister"] },
+        { "path": "Mapper1AdvancedTests.cs", "symbolId": "Mapper1AdvancedTests", "markers": ["Mapper1"] }
+      ],
+      "relevantPaths": ["Mmc1BankResolver.cs", "Mmc1Cart.cs"], "distractorPaths": ["PpuSpriteEvaluator.cs"],
+      "referenceTopics": ["mapper"], "verification": "verify --scope mapper"
+    },
+    {
+      "name": "cartridge-ines", "task": "an iNES trainer ROM maps PRG at the wrong offset and NES 2.0 metadata is rejected",
+      "requiredPaths": ["CartridgeFactory.cs", "NromCartTests.cs"],
+      "requiredEvidence": [
+        { "path": "CartridgeFactory.cs", "symbolId": "CartridgeFactory", "markers": ["CartridgeFactory"] },
+        { "path": "NromCartTests.cs", "symbolId": "NromCartTests", "markers": ["Nrom"] }
+      ],
+      "relevantPaths": ["Cartridge.cs", "NromCart.cs"], "distractorPaths": ["CpuInterruptHandler.cs"],
+      "referenceTopics": ["ines", "nes2"], "verification": "verify --scope cartridge"
+    },
+    {
+      "name": "winui-video", "task": "the WinUI app shows a gray frame although emulation keeps producing RGBA frames",
+      "requiredPaths": ["MainPageFramePresenter.cs", "NesEmulationSessionTests.cs"],
+      "requiredEvidence": [
+        { "path": "MainPageFramePresenter.cs", "symbolId": "MainPageFramePresenter", "markers": ["MainPageFramePresenter"] },
+        { "path": "NesEmulationSessionTests.cs", "symbolId": "NesEmulationSessionTests", "markers": ["NesEmulationSession"] }
+      ],
+      "relevantPaths": ["NesSessionFrameBuffer.cs", "RgbaToBgraConverterTests.cs"], "distractorPaths": ["Mmc3IrqTracker.cs"],
+      "verification": "verify --scope winui-video"
+    },
+    {
+      "name": "winui-audio", "task": "the selected AudioGraph device is healthy but streamed NES audio remains silent",
+      "requiredPaths": ["NesAudioGraphFactory.cs", "NesEmulationSessionAudioTests.cs"],
+      "requiredEvidence": [
+        { "path": "NesAudioGraphFactory.cs", "symbolId": "NesAudioGraphFactory", "markers": ["NesAudioGraphFactory"] },
+        { "path": "NesEmulationSessionAudioTests.cs", "symbolId": "NesEmulationSessionAudioTests", "markers": ["Audio"] }
+      ],
+      "relevantPaths": ["NesAudioFrameProvider.cs", "AudioFrameBuffer.cs"], "distractorPaths": ["Mmc1ShiftRegister.cs"],
+      "verification": "verify --scope winui-audio"
+    },
+    {
+      "name": "debugger-public-api", "task": "the public debugger API snapshot omits breakpoint and frame state",
+      "requiredPaths": ["INesDebugger.cs", "DebuggerTests.cs"],
+      "requiredEvidence": [
+        { "path": "INesDebugger.cs", "symbolId": "INesDebugger", "markers": ["INesDebugger"] },
+        { "path": "DebuggerTests.cs", "symbolId": "DebuggerTests", "markers": ["Debugger"] }
+      ],
+      "relevantPaths": ["NesDebugger.cs", "NesStateController.cs"], "distractorPaths": ["NesAudioGraphFactory.cs"],
+      "verification": "verify --scope debugger"
+    },
+    {
+      "name": "build-namespace-migration", "task": "a namespace migration causes cascading CS0246 build errors and a missing project reference",
+      "requiredPaths": ["BuildDiagnosticParser.cs", "BuildDiagnosticParserTests.cs"],
+      "requiredEvidence": [
+        { "path": "BuildDiagnosticParser.cs", "symbolId": "BuildDiagnosticParser", "markers": ["BuildDiagnosticParser"] },
+        { "path": "BuildDiagnosticParserTests.cs", "symbolId": "BuildDiagnosticParserTests", "markers": ["BuildDiagnosticParserTests"] }
+      ],
+      "relevantPaths": ["RoslynSymbolIndex.cs", "ContractBoundaryTests.cs"], "distractorPaths": ["PpuPaletteResolver.cs"],
+      "verification": "verify --scope lab-tests"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+description: Read-only semantic retrieval for nes-lab and Codex.
+prompt: |
+  Use Serena for narrow symbol discovery, declarations, references, implementations,
+  and diagnostics. The host provides file I/O, editing, shell execution, and durable
+  engineering memory. Read initial instructions and initialize the project before queries.
+excluded_tools:
+- create_text_file
+- read_file
+- find_file
+- list_dir
+- execute_shell_command
+- replace_content
+- replace_in_files
+- replace_symbol_body
+- insert_after_symbol
+- insert_before_symbol
+- delete_lines
+- replace_lines
+- insert_at_line
+- rename_symbol
+- safe_delete_symbol
+- write_memory
+- read_memory
+- list_memories
+- delete_memory
+- rename_memory
+- edit_memory
+- onboarding
+- open_dashboard
+- remove_project
+- restart_language_server
+- list_queryable_projects
+- query_project
+- jet_brains_find_symbol
+- jet_brains_move
+- jet_brains_safe_delete
+- jet_brains_inline_symbol
+- jet_brains_find_referencing_symbols
+- jet_brains_get_symbols_overview
+- jet_brains_type_hierarchy
+- jet_brains_find_declaration
+- jet_brains_find_implementations
+- jet_brains_rename
+- jet_brains_debug
+- jet_brains_run_inspections
+- jet_brains_list_inspections
+included_optional_tools:
+- get_diagnostics_for_symbol
+- serena_info
+tool_description_overrides: {}

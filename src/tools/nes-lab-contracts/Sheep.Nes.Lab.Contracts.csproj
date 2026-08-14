@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Sheep.Nes.Lab</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\nes-lab\RomCatalog.cs" Link="RomCatalog.cs" />
+    <Compile Include="..\nes-lab\TraceArtifact.cs" Link="TraceArtifact.cs" />
+    <Compile Include="..\nes-lab\TraceArtifactWriter.cs" Link="TraceArtifactWriter.cs" />
+  </ItemGroup>
+</Project>
