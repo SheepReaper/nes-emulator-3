@@ -2,5 +2,33 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "local>SheepReaper/renovate-config"
-  ]
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "platformAutomerge": false,
+  "ignoreTests": false,
+  "prConcurrentLimit": 5,
+  "packageRules": [
+    {
+      "description": "Route auto-mergeable dependency updates through pull request checks",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "automergeType": "pr"
+    },
+    {
+      "description": "Keep xUnit runner packages on compatible versions",
+      "matchPackageNames": [
+        "/^xunit/"
+      ],
+      "groupName": "xUnit test dependencies"
+    }
+  ],
+  "lockFileMaintenance": {
+    "automergeType": "pr"
+  }
 }

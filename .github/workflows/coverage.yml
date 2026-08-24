@@ -1,0 +1,66 @@
+name: Coverage
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "coverage-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  cpu-coverage:
+    name: CPU coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore CPU tests
+        run: dotnet restore test/cpu/Sheep.Emulation.Nes.Tests.csproj
+
+      - name: Install coverage collector
+        run: dotnet tool install --tool-path .artifacts/tools dotnet-coverage --version 18.10.0
+
+      - name: Collect CPU coverage
+        run: >-
+          .artifacts/tools/dotnet-coverage collect
+          "dotnet test test/cpu/Sheep.Emulation.Nes.Tests.csproj --no-restore --output Normal --
+          --report-xunit-trx --report-xunit-trx-filename coverage.trx
+          --report-xunit-junit --report-xunit-junit-filename coverage.junit.xml"
+          --settings .github/coverage.config
+          --output coverage/cobertura.xml
+          --output-format cobertura
+          --nologo
+
+      - name: Publish coverage test summary
+        if: ${{ !cancelled() && hashFiles('TestResults/*.junit.xml') != '' }}
+        uses: test-summary/action@37b508cfee6d4d080eedd00b5bb240a6a784a6a5 # v2.6
+        with:
+          paths: TestResults/*.junit.xml
+          show: "fail, skip"
+
+      - name: Upload failed coverage test results
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "coverage-test-results-${{ github.run_id }}"
+          path: TestResults/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "cpu-coverage-${{ github.run_id }}"
+          path: coverage/cobertura.xml
+          if-no-files-found: error
+          retention-days: 7

@@ -62,7 +62,12 @@ $actualArchiveHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash
 if ($actualArchiveHash -ne $holyMapperelArchiveHash) {
     throw "Expected Holy Mapperel archive SHA-256 $holyMapperelArchiveHash but downloaded $actualArchiveHash."
 }
-tar -xf $archive -C $resolvedHolyMapperelDestination
+$sevenZip = Get-Command 7z -ErrorAction SilentlyContinue
+if ($null -ne $sevenZip) {
+    & $sevenZip.Source x -y "-o$resolvedHolyMapperelDestination" $archive
+} else {
+    tar -xf $archive -C $resolvedHolyMapperelDestination
+}
 if ($LASTEXITCODE -ne 0) { throw 'Unable to extract the pinned Holy Mapperel release.' }
 
 Write-Host "Installed hardware-validated NES test ROMs at $resolvedDestination"

@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "ci-${{ github.event.pull_request.number || github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: Core build and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check out pinned AccuracyCoin source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: 100thCoin/AccuracyCoin
+          ref: 7dc08e5aeb4c3dd146b009a32797f16ae45c78a4
+          path: test-roms/accuracy-coin
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore core tests
+        run: dotnet restore test/cpu/Sheep.Emulation.Nes.Tests.csproj
+
+      - name: Restore NES Lab tests
+        run: dotnet restore test/nes-lab/Sheep.Nes.Lab.Tests.csproj
+
+      - name: Restore command-line tester
+        run: dotnet restore src/tester/tester.csproj
+
+      - name: Build emulator library
+        run: dotnet build src/lib/emulation/Sheep.Emulation.Nes.csproj --no-restore
+
+      - name: Build command-line tester
+        run: dotnet build src/tester/tester.csproj --no-restore
+
+      - name: Run CPU tests
+        run: >-
+          dotnet test test/cpu/Sheep.Emulation.Nes.Tests.csproj --no-restore --output Normal --
+          --report-xunit-trx --report-xunit-trx-filename cpu.trx
+          --report-xunit-junit --report-xunit-junit-filename cpu.junit.xml
+
+      - name: Run NES Lab tests
+        run: >-
+          dotnet test test/nes-lab/Sheep.Nes.Lab.Tests.csproj --no-restore --output Normal --
+          --report-xunit-trx --report-xunit-trx-filename nes-lab.trx
+          --report-xunit-junit --report-xunit-junit-filename nes-lab.junit.xml
+
+      - name: Publish core test summary
+        if: ${{ !cancelled() && hashFiles('TestResults/*.junit.xml') != '' }}
+        uses: test-summary/action@37b508cfee6d4d080eedd00b5bb240a6a784a6a5 # v2.6
+        with:
+          paths: TestResults/*.junit.xml
+          show: "fail, skip"
+
+      - name: Upload failed core test results
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "core-test-results-${{ github.run_id }}"
+          path: TestResults/
+          if-no-files-found: warn
+          retention-days: 7
+
+  winui:
+    name: WinUI build and tests
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore WinUI application
+        run: dotnet restore src/emulator-winui/EmuSheep.csproj
+
+      - name: Restore WinUI tests
+        run: dotnet restore test/emulator-winui/EmuSheep.Tests.csproj
+
+      - name: Build WinUI application
+        run: dotnet build src/emulator-winui/EmuSheep.csproj --no-restore
+
+      - name: Run WinUI tests
+        run: >-
+          dotnet test test/emulator-winui/EmuSheep.Tests.csproj --no-restore --output Normal --
+          --report-xunit-trx --report-xunit-trx-filename winui.trx
+          --report-xunit-junit --report-xunit-junit-filename winui.junit.xml
+
+      - name: Publish WinUI test summary
+        if: ${{ !cancelled() && hashFiles('TestResults/*.junit.xml') != '' }}
+        uses: test-summary/action@37b508cfee6d4d080eedd00b5bb240a6a784a6a5 # v2.6
+        with:
+          paths: TestResults/*.junit.xml
+          show: "fail, skip"
+
+      - name: Upload failed WinUI test results
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "winui-test-results-${{ github.run_id }}"
+          path: TestResults/
+          if-no-files-found: warn
+          retention-days: 7

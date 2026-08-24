@@ -1,0 +1,61 @@
+name: Conformance
+
+on:
+  schedule:
+    - cron: "17 5 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: conformance
+  cancel-in-progress: true
+
+jobs:
+  conformance:
+    name: NES conformance suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Install ROM archive tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends p7zip-full
+
+      - name: Install pinned conformance ROMs
+        shell: pwsh
+        run: ./test/conformance/Install-TestRoms.ps1
+
+      - name: Restore conformance tests
+        run: dotnet restore test/conformance/Sheep.Emulation.Nes.ConformanceTests.csproj
+
+      - name: Run conformance tests
+        run: >-
+          dotnet test test/conformance/Sheep.Emulation.Nes.ConformanceTests.csproj --no-restore --output Normal --
+          --report-xunit-trx --report-xunit-trx-filename conformance.trx
+          --report-xunit-junit --report-xunit-junit-filename conformance.junit.xml
+
+      - name: Publish conformance test summary
+        if: ${{ !cancelled() && hashFiles('TestResults/*.junit.xml') != '' }}
+        uses: test-summary/action@37b508cfee6d4d080eedd00b5bb240a6a784a6a5 # v2.6
+        with:
+          paths: TestResults/*.junit.xml
+          show: "fail, skip"
+
+      - name: Upload failed conformance test results
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "conformance-test-results-${{ github.run_id }}"
+          path: TestResults/
+          if-no-files-found: warn
+          retention-days: 7
