@@ -162,6 +162,15 @@ public sealed class RunHistoryStore : IVerificationRunSink, IDisposable
     public RunHistoryEntry? Latest(VerificationScope? scope = null, string? caseName = null, bool failuresOnly = false) =>
         Query(scope, caseName, failuresOnly, null, 1).SingleOrDefault();
 
+    public RunHistoryEntry? LatestFull(VerificationScope scope)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT id,completed_utc,scope,case_name,outcome,success,cached,duration_ms,raw_bytes,artifact_path,trace_artifact_path,fingerprint,source_revision,failure_signature,source_dirty,working_tree_digest,lab_version,contract_schema_version,resource_uri,log_resource_uri,trace_resource_uri,verification_status,exit_policy,matches_accepted_baseline,has_regressions,has_resolved_baseline_cases FROM runs WHERE scope=$scope AND case_name IS NULL ORDER BY completed_utc DESC LIMIT 1";
+        command.Parameters.AddWithValue("$scope", scope.ToString());
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? Read(reader) : null;
+    }
+
     public IReadOnlyList<RunHistoryEntry> SearchFailures(string query, int maximumResults = 32) =>
         Query(null, null, true, query, maximumResults);
 

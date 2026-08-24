@@ -7,7 +7,7 @@ public sealed class LabCapabilityCatalogTests
     {
         var groups = LabCapabilityCatalog.List();
 
-        Assert.Equal(["code", "context", "memory", "feedback", "references", "experiment", "media", "investigate", "session", "host", "build", "rom", "trace", "verify", "history", "diagnose", "artifacts"],
+        Assert.Equal(["code", "context", "memory", "feedback", "references", "experiment", "media", "investigate", "session", "host", "build", "rom", "trace", "verify", "baseline", "history", "diagnose", "artifacts"],
             groups.Select(group => group.Name));
         Assert.All(groups, group => Assert.False(string.IsNullOrWhiteSpace(group.Summary)));
         Assert.DoesNotContain("parameters", System.Text.Json.JsonSerializer.Serialize(groups),

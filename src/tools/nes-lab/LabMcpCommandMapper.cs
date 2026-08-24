@@ -54,6 +54,8 @@ public static class LabMcpCommandMapper
             ("trace", "capture") => ["trace", "capture", "--case", Required(arguments, "caseName"),
                 "--timeout-seconds", Integer(arguments, "timeoutSeconds", 30)],
             ("verify", "run") => Verify(arguments),
+            ("baseline", "show") => ["baseline", "show"],
+            ("baseline", "update") => BaselineUpdate(arguments),
             ("history", "latest") => HistoryLatest(arguments),
             ("history", "search") => ["failures", "search", "--query", Required(arguments, "query"),
                 "--max", Integer(arguments, "maximumResults", 32)],
@@ -238,6 +240,13 @@ public static class LabMcpCommandMapper
         Flag(result, value, "traceAlways", "--trace-always");
         Flag(result, value, "planOnly", "--plan-only");
         Flag(result, value, "baselineAwareExitCode", "--baseline-aware-exit-code");
+        return result;
+    }
+
+    private static IReadOnlyList<string> BaselineUpdate(JsonElement value)
+    {
+        List<string> result = ["baseline", "update", "--run", Optional(value, "runId") ?? "latest"];
+        Flag(result, value, "apply", "--apply");
         return result;
     }
 

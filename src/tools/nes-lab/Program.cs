@@ -28,6 +28,56 @@ if (args.Length > 0 && args[0].Equals("mcp", StringComparison.OrdinalIgnoreCase)
 
 var options = LabResponseSerializer.Options;
 
+if (args.Length > 0 && args[0].Equals("baseline", StringComparison.OrdinalIgnoreCase))
+{
+    var baselineParsed = BaselineCommandParser.Parse(args);
+    if (baselineParsed.Error is not null)
+    {
+        Console.WriteLine(JsonSerializer.Serialize(new { schemaVersion = 1, success = false,
+            error = baselineParsed.Error }, options));
+        return 2;
+    }
+    try
+    {
+        var root = Directory.GetCurrentDirectory();
+        var baselinePath = Path.Combine(root, "src", "tools", "nes-lab", "accepted-conformance-baseline.v1.json");
+        var baseline = ConformanceBaselineComparer.Load(baselinePath);
+        if (baselineParsed.Operation == "show")
+        {
+            Console.WriteLine(JsonSerializer.Serialize(new { schemaVersion = 1, success = true,
+                operation = "baseline-show", result = baseline }, options));
+            return 0;
+        }
+
+        var historyPath = Path.Combine(root, ".artifacts", "nes-lab", "index.sqlite");
+        if (!File.Exists(historyPath)) throw new KeyNotFoundException("NES Lab run history is unavailable.");
+        using var history = new RunHistoryStore(historyPath, root);
+        var requestedRun = baselineParsed.Invocation!;
+        var run = requestedRun.RunId.Equals("latest", StringComparison.OrdinalIgnoreCase)
+            ? history.LatestFull(VerificationScope.Conformance) ??
+                throw new KeyNotFoundException("No complete conformance run exists in NES Lab history.")
+            : history.Get(requestedRun.RunId);
+        var current = RepositoryProvenance.Capture(root);
+        if (!string.Equals(run.SourceRevision, current.Head, StringComparison.Ordinal) ||
+            !string.Equals(run.WorkingTreeDigest, current.WorkingTreeDigest, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"Run '{run.Id}' is stale for the current repository state. Run a complete conformance verification first.");
+        if (!File.Exists(run.ArtifactPath))
+            throw new FileNotFoundException("The selected run log is no longer available.", run.ArtifactPath);
+        var proposal = ConformanceBaselineManager.Propose(baseline, run, File.ReadAllText(run.ArtifactPath));
+        if (requestedRun.Apply) proposal = ConformanceBaselineManager.Apply(proposal, baselinePath);
+        Console.WriteLine(JsonSerializer.Serialize(new { schemaVersion = 1, success = true,
+            operation = "baseline-update", result = proposal }, options));
+        return 0;
+    }
+    catch (Exception exception)
+    {
+        Console.WriteLine(JsonSerializer.Serialize(new { schemaVersion = 1, success = false,
+            error = new LabError("baseline_update_rejected", exception.Message) }, options));
+        return 3;
+    }
+}
+
 var historyArgs = args.Length > 0 && args[0].Equals("history", StringComparison.OrdinalIgnoreCase)
     ? args.Skip(1).ToArray() : args;
 

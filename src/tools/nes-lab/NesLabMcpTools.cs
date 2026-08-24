@@ -11,7 +11,7 @@ public static class NesLabMcpTools
     [McpServerTool(Name = "nes_lab_discover", ReadOnly = true, Idempotent = true),
      Description("Lists compact nes-lab capability groups, or describes one group with its operations and parameters.")]
     public static object Discover(
-        [Description("Optional capability name: verify, trace, rom, code, memory, context, history, diagnose, artifacts, feedback, references, experiment, media, investigate, session, host, or build.")]
+        [Description("Optional capability name: verify, baseline, trace, rom, code, memory, context, history, diagnose, artifacts, feedback, references, experiment, media, investigate, session, host, or build.")]
         string? capability = null)
     {
         var result = string.IsNullOrWhiteSpace(capability)
@@ -45,6 +45,8 @@ public static class NesLabMcpTools
         CancellationToken cancellationToken)
     {
         var isRun = capability.Equals("verify", StringComparison.OrdinalIgnoreCase) ||
+            capability.Equals("baseline", StringComparison.OrdinalIgnoreCase) &&
+            operation.Equals("update", StringComparison.OrdinalIgnoreCase) ||
             capability.Equals("diagnose", StringComparison.OrdinalIgnoreCase) &&
             operation.Equals("run", StringComparison.OrdinalIgnoreCase) ||
             capability.Equals("artifacts", StringComparison.OrdinalIgnoreCase) &&

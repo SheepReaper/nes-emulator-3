@@ -79,4 +79,16 @@ public sealed class LabMcpCommandMapperTests
 
         Assert.Contains("--baseline-aware-exit-code", arguments);
     }
+
+    [Fact]
+    public void Map_BaselineUpdate_RequiresExplicitApplyFlag()
+    {
+        using var preview = JsonDocument.Parse("{}");
+        using var apply = JsonDocument.Parse("""{"runId":"run-1","apply":true}""");
+
+        Assert.Equal(["baseline", "update", "--run", "latest"],
+            LabMcpCommandMapper.Map("baseline", "update", preview.RootElement));
+        Assert.Equal(["baseline", "update", "--run", "run-1", "--apply"],
+            LabMcpCommandMapper.Map("baseline", "update", apply.RootElement));
+    }
 }

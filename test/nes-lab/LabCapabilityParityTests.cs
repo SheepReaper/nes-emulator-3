@@ -47,6 +47,7 @@ public sealed class LabCapabilityParityTests
         ("trace", "query") => "{\"artifactPath\":\"trace.json\"}",
         ("trace", "diff") => "{\"expectedArtifactPath\":\"a.json\",\"actualArtifactPath\":\"b.json\"}",
         ("trace", "capture") => "{\"caseName\":\"case\"}",
+        ("baseline", "update") => "{\"runId\":\"latest\"}",
         ("history", "search") => "{\"query\":\"failure\"}",
         ("diagnose", "run") => "{\"caseName\":\"case\"}",
         ("artifacts", "pin" or "unpin") => "{\"uri\":\"nes-lab://artifact/log/sha256/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",

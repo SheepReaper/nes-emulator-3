@@ -29,6 +29,8 @@ Lab itself; the published output can be stale until the restore script is run.
 ```powershell
 dotnet run --project src/tools/nes-lab/Sheep.Nes.Lab.csproj -- verify --scope cpu
 dotnet run --project src/tools/nes-lab/Sheep.Nes.Lab.csproj -- verify --changed --baseline-aware-exit-code
+dotnet run --project src/tools/nes-lab/Sheep.Nes.Lab.csproj -- baseline update
+dotnet run --project src/tools/nes-lab/Sheep.Nes.Lab.csproj -- baseline update --apply
 dotnet run --project src/tools/nes-lab/Sheep.Nes.Lab.csproj -- trace capture --case "Implicit DMA Abort"
 dotnet run --project src/tools/nes-lab/Sheep.Nes.Lab.csproj -- diagnose --case "Delta Modulation Channel" --budget 16000
 dotnet run --project src/tools/nes-lab/Sheep.Nes.Lab.csproj -- diagnose --run latest --budget 16000
@@ -67,6 +69,12 @@ Verification responses always separate `executionPassed`, `matchesAcceptedBaseli
 the underlying command failure. Opt-in `--baseline-aware-exit-code` returns zero for the accepted
 conformance baseline or an improved baseline, but never for a new failure, changed diagnostic,
 unexpected pass/skip count, cancellation, or infrastructure failure.
+
+When a complete conformance run resolves accepted failures, `baseline update` previews the exact
+count and known-failure changes. `--apply` is deliberately separate and atomically adopts only that
+improvement. Focused or stale runs, incomplete summaries, new failures, and changed known-failure
+diagnostics are rejected, so baseline management cannot silently bless a regression. The same
+workflow is available through the MCP `baseline.show` and state-changing `baseline.update` operations.
 
 The repository-level enforcement remains simple: start with `context build` or `diagnose --run latest` before a broad code read, and use `gateway benchmark` to measure whether the evidence-first flow still preserves required evidence under tight budgets.
 

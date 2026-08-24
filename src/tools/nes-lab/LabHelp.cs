@@ -26,6 +26,17 @@ public static class LabHelp
               Selectors include --task, --symbol, --id, --changed, --subsystem, --run, and --handoff.
             Builds a bounded source context packet.
             """,
+        "baseline" or "baseline update" => """
+            nes-lab baseline update [--run <id|latest>] [--apply]
+            Previews an accepted-conformance-baseline update from a complete indexed run.
+            --apply atomically writes the previewed improvement. New failures, changed diagnostics,
+            focused runs, stale runs, and incomplete summaries are always rejected.
+            nes-lab baseline show
+            """,
+        "baseline show" => """
+            nes-lab baseline show
+            Reads the current accepted conformance baseline without changing local state.
+            """,
         "investigate" => """
             nes-lab investigate (--task <text>|--run <id|latest>) --agent local
               [--budget <bytes>] [--max-steps <1..16>]
@@ -89,6 +100,7 @@ public static class LabHelp
 
             Commands:
               verify      Run focused repository verification.
+              baseline    Show or safely update the accepted conformance baseline.
               diagnose    Build a source-backed failure packet.
               context     Build bounded source context.
               trace       Capture, query, or diff traces.
